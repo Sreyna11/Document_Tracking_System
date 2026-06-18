@@ -229,7 +229,10 @@ export default function NotificationPage() {
                 {notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    onClick={() => !notif.read && markAsRead(notif.id)}
+                    onClick={() => {
+                      if (!notif.read) markAsRead(notif.id);
+                      if (notif.requestId) router.push(`/content/receive?id=${notif.requestId}`);
+                    }}
                     className={`bg-white border rounded-2xl p-5 flex items-start md:items-center justify-between shadow-xs transition-all duration-300 gap-4 cursor-pointer hover:shadow-md ${!notif.read ? "border-l-4 border-l-green-500 border-gray-200 bg-green-50/30" : "border-gray-100 hover:border-green-600/30"
                       }`}
                   >
@@ -253,6 +256,15 @@ export default function NotificationPage() {
                         <div className="flex items-center gap-2">
                           <h3 className="text-[17px] font-bold text-gray-800 truncate">{notif.senderName}</h3>
                           {!notif.read && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                          {(notif.priorityLevel || "Normal") && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              (notif.priorityLevel || "").toLowerCase() === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200' : 
+                              (notif.priorityLevel || "").toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 
+                              'bg-blue-100 text-blue-700 border border-blue-200'
+                            }`}>
+                              {notif.priorityLevel || "Normal"}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[12px] text-gray-400 font-semibold mt-1">From: {notif.senderDepartment}</p>
                         <p className="text-[13px] text-gray-700 mt-2 flex items-start gap-1.5 font-bold">
@@ -279,18 +291,6 @@ export default function NotificationPage() {
                           </div>
                         )}
                       </div>
-                      {notif.requestId && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!notif.read) markAsRead(notif.id);
-                            router.push(`/content/received?reqId=${notif.requestId}`);
-                          }}
-                          className="px-4 py-1.5 bg-white hover:bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-bold transition-colors shadow-sm"
-                        >
-                          View
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))}

@@ -53,7 +53,7 @@ export default function DocumentTypePage() {
     if (stored) {
       let parsed = JSON.parse(stored);
       let updated = false;
-      const isGlobalSuperAdmin = user?.email === "itcsuperadmin@rupp.edu.kh";
+      const isGlobalSuperAdmin = user?.email === "admin@rupp.edu.kh";
       const userDept = (user?.department || user?.mainRole || "IT Center").toLowerCase().trim();
       parsed = parsed.map(d => {
         if (!d.creatorDept) {

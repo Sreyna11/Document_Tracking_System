@@ -164,8 +164,7 @@ export default function AccountPage() {
   }, [searchTerm, itemsPerPage]);
   const getAvailableRoles = (mainRole, currentRole) => {
     let allowedRoles = dynamicRoles.filter(r => {
-      const rDept = (r.department || "global").toLowerCase().trim();
-      if (rDept === "global") return true;
+      const rDept = (r.department || "IT Center").toLowerCase().trim();
       if (mainRole && rDept === mainRole.toLowerCase().trim()) return true;
       return false;
     });
@@ -185,7 +184,7 @@ export default function AccountPage() {
       </div>
     );
   }
-  const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
+  const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
   const adminCheckStr = (currentUser?.type || currentUser?.role || "").toLowerCase();
   const isDepartmentAdmin = adminCheckStr.includes("super admin") || adminCheckStr === "admin";
   const hasAccess = true;
@@ -200,14 +199,27 @@ export default function AccountPage() {
     setStatus("Active");
     setIsEditMode(false);
     setEditingUserId(null);
-    if (!isGlobalSuperAdmin && isDepartmentAdmin) {
+    if (!isGlobalSuperAdmin) {
       const allowedDept = currentUser.department || currentUser.mainRole;
-      setSelectedMainRole(allowedDept);
-      const defaultRoles = getAvailableRoles(allowedDept, "");
-      const defRole = defaultRoles.length > 0 ? defaultRoles[0] : "";
-      setSelectedRole(defRole);
-      const roleObj = dynamicRoles.find(r => r.title === defRole);
-      setSelectedType(roleObj?.type || "");
+      if (allowedDept) {
+        setSelectedMainRole(allowedDept);
+        const defaultRoles = getAvailableRoles(allowedDept, "");
+        const defRole = defaultRoles.length > 0 ? defaultRoles[0] : "";
+        setSelectedRole(defRole);
+        const roleObj = dynamicRoles.find(r => r.title === defRole);
+        setSelectedType(roleObj?.type || "");
+      } else if (mainRoles.length > 0) {
+        setSelectedMainRole(mainRoles[0]);
+        const defaultRoles = getAvailableRoles(mainRoles[0], "");
+        const defRole = defaultRoles.length > 0 ? defaultRoles[0] : "";
+        setSelectedRole(defRole);
+        const roleObj = dynamicRoles.find(r => r.title === defRole);
+        setSelectedType(roleObj?.type || "");
+      } else {
+        setSelectedMainRole("");
+        setSelectedRole("");
+        setSelectedType("");
+      }
     } else if (mainRoles.length > 0) {
       setSelectedMainRole(mainRoles[0]);
       const defaultRoles = getAvailableRoles(mainRoles[0], "");
@@ -318,14 +330,8 @@ export default function AccountPage() {
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        if (isGlobalSuperAdmin || isDepartmentAdmin) {
-          setViewState('LIST');
-          resetForm();
-        } else {
-          setViewState('VIEW');
-          const updated = updatedUsers.find(u => u.id === editingUserId);
-          if (updated) setSelectedUserView(updated);
-        }
+        setViewState('LIST');
+        resetForm();
       }, 1000);
     } else {
       const newUser = {
@@ -352,12 +358,8 @@ export default function AccountPage() {
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        if (isGlobalSuperAdmin || isDepartmentAdmin) {
-          setViewState('LIST');
-          resetForm();
-        } else {
-          setViewState('VIEW');
-        }
+        setViewState('LIST');
+        resetForm();
       }, 1000);
     }
   };
@@ -408,11 +410,10 @@ export default function AccountPage() {
     return `${f}${l}` || "?";
   };
   const filteredUsers = usersList.filter(user => {
-    // Departmental Admins only see users from their own department
     if (!isGlobalSuperAdmin) {
       const allowedDept = (currentUser?.department || currentUser?.mainRole || "").toLowerCase().trim();
       const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
-      if (userDept !== allowedDept) return false;
+      if (allowedDept && userDept !== allowedDept) return false;
     }
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -447,12 +448,12 @@ export default function AccountPage() {
                   <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-black dark:text-white">{t("account")}</h1>
                     {hasPermission(currentUser, "Account", "Create") && (
-                      <button
-                        onClick={() => { resetForm(); setViewState('CREATE'); }}
-                        className="px-6 py-2 bg-[#1a5b28] hover:bg-[#13461d] text-white text-[14px] font-medium rounded-md transition-colors"
-                      >
-                        {t("add_role")}
-                      </button>
+                        <button
+                          onClick={() => { resetForm(); setViewState('CREATE'); }}
+                          className="px-6 py-2 bg-[#1a5b28] hover:bg-[#13461d] text-white text-[14px] font-medium rounded-md transition-colors"
+                        >
+                          {t("new_user") || "New User"}
+                        </button>
                     )}
                   </div>
                   <div className="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-[#2A2F3A] flex flex-col overflow-hidden">
@@ -491,12 +492,12 @@ export default function AccountPage() {
                                 {selectedRows.length === paginatedUsers.length && paginatedUsers.length > 0 && <span className="text-white text-[10px] font-bold">✓</span>}
                               </div>
                             </th>
-                            <th className="py-3 px-4">{t("profile_photo")}</th>
-                            <th className="py-3 px-4">{t("first_name")} / {t("last_name")}</th>
-                            <th className="py-3 px-4">{t("email_contact")}</th>
-                            <th className="py-3 px-4">{t("role")}</th>
-                            <th className="py-3 px-4">{t("role")}</th>
-                            <th className="py-3 px-4">{t("sub_role")}</th>
+                            <th className="py-3 px-4">Profile Picture</th>
+                            <th className="py-3 px-4">Full Name</th>
+                            <th className="py-3 px-4">Email</th>
+                            <th className="py-3 px-4">Department</th>
+                            <th className="py-3 px-4">Title</th>
+                            <th className="py-3 px-4">Role</th>
                             <th className="py-3 px-4 w-24"></th>
                           </tr>
                         </thead>
@@ -534,12 +535,11 @@ export default function AccountPage() {
                                 </td>
                                 <td className="py-3 px-4">
                                   {user.type ? (
-                                    <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-bold rounded-sm ${
-                                      user.type.toLowerCase().trim() === "super admin" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/30" :
-                                      user.type.toLowerCase().trim() === "admin" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30" :
-                                      user.type.toLowerCase().trim() === "head of unit" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30" :
-                                      user.type.toLowerCase().trim() === "staff" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/30" :
-                                      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                                    <span className={`inline-flex items-center justify-center px-3 py-1 text-[12px] font-bold rounded-sm ${
+                                      (user.type || '').toLowerCase().includes('super') ? 'bg-green-100 text-green-700' :
+                                      (user.type || '').toLowerCase().includes('admin') ? 'bg-pink-100 text-pink-700' :
+                                      (user.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
+                                      'bg-gray-100 text-gray-700'
                                     }`}>{user.type}</span>
                                   ) : <span className="text-gray-400 italic text-[11px]">N/A</span>}
                                 </td>
@@ -628,12 +628,8 @@ export default function AccountPage() {
                       )}
                       <button
                         onClick={() => { 
-                          if (isGlobalSuperAdmin || isDepartmentAdmin) {
-                            setViewState('LIST'); 
-                            resetForm(); 
-                          } else {
-                            setViewState('VIEW');
-                          }
+                          setViewState('LIST'); 
+                          resetForm(); 
                         }}
                         className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
                       >
@@ -846,17 +842,13 @@ export default function AccountPage() {
                         type="submit"
                         className="px-8 py-2.5 bg-[#125821] hover:bg-[#0c4015] text-white text-[14px] font-bold rounded-md transition-colors"
                       >
-                        {t("save_changes")}
+                        {t("save") || "Save"}
                       </button>
                       <button
                         type="button"
                         onClick={() => { 
-                          if (isGlobalSuperAdmin || isDepartmentAdmin) {
-                            setViewState('LIST'); 
-                            resetForm(); 
-                          } else {
-                            setViewState('VIEW');
-                          }
+                          setViewState('LIST'); 
+                          resetForm(); 
                         }}
                         className="px-8 py-2.5 bg-red-600 hover:bg-red-700 text-white text-[14px] font-bold rounded-md transition-colors"
                       >
@@ -962,7 +954,7 @@ export default function AccountPage() {
                         </div>
                         <div>
                           <div className="text-[14px] font-bold text-black dark:text-white mb-1">Campus Suite</div>
-                          <div className="text-[#1a5b28] text-[14px]">Room 103 A</div>
+                          <div className="text-[#1a5b28] text-[14px]">{selectedUserView.campusSuite}</div>
                         </div>
                         <div>
                           <div className="text-[14px] font-bold text-black dark:text-white mb-1">Title</div>

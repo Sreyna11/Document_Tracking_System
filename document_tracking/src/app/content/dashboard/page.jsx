@@ -59,6 +59,14 @@ export default function DashboardPage() {
     const [docTypeUsageData, setDocTypeUsageData] = useState([]);
     const [recentRequests, setRecentRequests] = useState([]);
     useEffect(() => {
+        if (showLongestModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => { document.body.style.overflow = 'unset'; };
+    }, [showLongestModal]);
+    useEffect(() => {
         const userStr = sessionStorage.getItem("currentUser");
         if (!userStr) {
             router.push("/");
@@ -100,7 +108,7 @@ export default function DashboardPage() {
                 return r.date.startsWith(selectedMonth);
             });
             // Filter by department involvement so each sees their own data
-            const isGlobalSuperAdmin = user.email === "itcsuperadmin@rupp.edu.kh";
+            const isGlobalSuperAdmin = user.email === "admin@rupp.edu.kh";
             const myRelevantRequests = filteredReqs.filter(req => {
                 if (isGlobalSuperAdmin) return true;
                 const isSender = req.senderName === user.username ||
@@ -406,7 +414,7 @@ export default function DashboardPage() {
                             <div className="text-xs font-semibold text-orange-500 dark:text-orange-400 mt-1 flex items-center gap-1">{t("requires_attention")} <ChevronRight size={12} /></div>
                         </div>
                         {/* Total Sent */}
-                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/tracking")}>
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/tracking-document")}>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
                                     <FileText size={16} />
@@ -449,8 +457,9 @@ export default function DashboardPage() {
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.inProgress}</div>
                             <div className="text-xs font-semibold text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">{t("currently_in_process")} <ChevronRight size={12} /></div>
                         </div>
-                        {/* Row 2: Charts and Tables */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    </div>
+                    {/* Row 2: Charts and Tables */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Activity Overview */}
                             <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col min-h-[350px]">
                                 <div className="flex items-center gap-2 mb-6">
@@ -554,7 +563,7 @@ export default function DashboardPage() {
                                             ) : longestApprovalRequests.map((req, idx) => (
                                                 <tr
                                                     key={idx}
-                                                    onClick={() => router.push("/content/tracking?id=" + req.id)}
+                                                    onClick={() => router.push("/content/tracking-document?id=" + req.id)}
                                                     className="border-b border-slate-50 dark:border-[#242B36] last:border-none hover:bg-slate-50 dark:hover:bg-[#242B36]/50 transition-colors cursor-pointer"
                                                 >
                                                     <td className="py-3 pr-4 text-slate-500 dark:text-slate-400">{req.documentType}</td>
@@ -632,7 +641,7 @@ export default function DashboardPage() {
                                             const isCompleted = status === "completed";
                                             const isReturned = status === "assigned to improve" || status === "failed";
                                             return (
-                                                <div key={idx} className="flex flex-col gap-2 p-3.5 rounded-xl border border-slate-100 dark:border-[#2A2F3A] bg-white dark:bg-[#161B22] hover:border-blue-100 dark:hover:border-blue-500/30 hover:shadow-sm transition-all cursor-pointer" onClick={() => router.push("/content/tracking?id=" + req.id)}>
+                                                <div key={idx} className="flex flex-col gap-2 p-3.5 rounded-xl border border-slate-100 dark:border-[#2A2F3A] bg-white dark:bg-[#161B22] hover:border-blue-100 dark:hover:border-blue-500/30 hover:shadow-sm transition-all cursor-pointer" onClick={() => router.push("/content/tracking-document?id=" + req.id)}>
                                                     {/* Top Row: ID & Status */}
                                                     <div className="flex justify-between items-center">
                                                         <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 tracking-wider">#{req.trackingNumber || req.id}</span>
@@ -666,7 +675,7 @@ export default function DashboardPage() {
                                         })
                                     )}
                                     {recentRequests.length > 0 && (
-                                        <button className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-center py-2" onClick={() => router.push("/content/tracking")}>
+                                        <button className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-center py-2" onClick={() => router.push("/content/tracking-document")}>
                                             {t("view_all_requests")}
                                         </button>
                                     )}
@@ -676,8 +685,8 @@ export default function DashboardPage() {
                         
                         {/* Longest Time Request Detail Modal */}
                             {showLongestModal && selectedLongestReq && (
-                                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowLongestModal(false)}>
-                                    <div className="bg-white dark:bg-[#161B22] rounded-2xl shadow-xl border border-slate-100 dark:border-[#2A2F3A] w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-md animate-fade-in p-4 sm:p-6" onClick={() => setShowLongestModal(false)}>
+                                    <div className="mx-auto mt-8 sm:mt-12 mb-8 bg-white dark:bg-[#161B22] rounded-2xl shadow-xl border border-slate-100 dark:border-[#2A2F3A] w-full max-w-4xl flex flex-col" onClick={e => e.stopPropagation()}>
                                         {/* Modal Header */}
                                         <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-[#2A2F3A]">
                                             <h2 className="text-xl font-black text-slate-800 dark:text-white">{t("request_details")}</h2>
@@ -689,9 +698,9 @@ export default function DashboardPage() {
                                             </button>
                                         </div>
                                         {/* Modal Body */}
-                                        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50/50 dark:bg-[#0F1117]/80">
+                                        <div className="p-6 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-white dark:bg-[#0F1117] rounded-b-2xl">
                                             {/* Left Panel: Request Taking Longest */}
-                                            <div className="bg-white dark:bg-[#242B36] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
+                                            <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-purple-500"></div>
                                                 <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">{t("request_taking_longest") || "Request Taking Longest"}</h3>
                                                 <div className="flex items-start gap-4 mb-8">
@@ -727,7 +736,7 @@ export default function DashboardPage() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="mt-auto flex items-center justify-between p-4 bg-slate-50 dark:bg-[#161B22] rounded-xl border border-slate-100 dark:border-[#2A2F3A]">
+                                                <div className="mt-auto flex items-center justify-between p-4 bg-white dark:bg-[#161B22] rounded-xl border border-slate-100 dark:border-[#2A2F3A]">
                                                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm">
                                                         <Clock size={16} />
                                                         Total Time Elapsed
@@ -738,13 +747,13 @@ export default function DashboardPage() {
                                                 </div>
                                             </div>
                                             {/* Right Panel: Step Taking Longest Time */}
-                                            <div className="bg-white dark:bg-[#242B36] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
+                                            <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
                                                 <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">Step Taking Longest Time</h3>
 
                                                 <div className="overflow-hidden border border-slate-100 dark:border-[#2A2F3A] rounded-xl mb-6">
                                                     <table className="w-full text-left text-sm whitespace-nowrap">
-                                                        <thead className="bg-slate-50 dark:bg-[#161B22]">
+                                                        <thead className="bg-white dark:bg-[#161B22]">
                                                             <tr className="text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider">
                                                                 <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">Step</th>
                                                                 <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">Department</th>
@@ -753,12 +762,12 @@ export default function DashboardPage() {
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100 dark:divide-[#2A2F3A] font-medium text-slate-700 dark:text-slate-300">
                                                             {selectedLongestReq.stepsDetail?.map((step, idx) => (
-                                                                <tr key={idx} className={step.timeMs === selectedLongestReq.longestStepMs ? 'bg-rose-50/30 dark:bg-rose-900/20' : ''}>
+                                                                <tr key={idx} className="bg-white dark:bg-transparent">
                                                                     <td className="px-4 py-3.5 text-slate-600 dark:text-slate-400">{step.index}. {step.name}</td>
                                                                     <td className="px-4 py-3.5 text-slate-800 dark:text-white font-semibold">{step.department}</td>
                                                                     <td className="px-4 py-3.5 text-right">
                                                                         {step.timeMs > 0 ? (
-                                                                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${step.timeMs === selectedLongestReq.longestStepMs ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-[#161B22] text-slate-600 dark:text-slate-400'}`}>
+                                                                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${step.timeMs === selectedLongestReq.longestStepMs ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-[#161B22] text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700'}`}>
                                                                                 {step.timeFormatted}
                                                                             </span>
                                                                         ) : <span className="text-slate-400 dark:text-slate-600 font-bold">—</span>}
@@ -773,7 +782,7 @@ export default function DashboardPage() {
                                                         </tbody>
                                                     </table>
                                                 </div>
-                                                <div className="mt-auto flex items-start gap-3 p-4 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                                <div className="mt-auto flex items-start gap-3 p-4 bg-white dark:bg-[#161B22] text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
                                                     <Info size={18} className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
                                                     <span className="text-sm font-medium leading-relaxed">
                                                         The <strong className="font-bold">{selectedLongestReq.longestStepName}</strong> step is taking the longest.
@@ -784,7 +793,6 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             )}
-                        </div>
                     </div>
                 </main>
             </div>

@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Sidebar from "../../../components/Sidebar";
+import Navbar from "../../../components/Navbar";
 import { MapPin, Search, Check, Clock, AlertTriangle, FileText, Package, Navigation, Map as MapIcon, Play } from "lucide-react";
 const DeliveryTruckAnimation = ({ currentStep, onComplete }) => {
   useEffect(() => {
@@ -105,15 +107,34 @@ export default function TrackingPage() {
   const formatDuration = (startStr, endStr) => {
     if (!startStr) return null;
     const start = new Date(startStr);
-    const end = endStr ? new Date(endStr) : now;
+    let fallbackEnd = now;
+    if (selectedRequest && (selectedRequest.status === "Failed" || selectedRequest.status === "Completed" || selectedRequest.status === "Assigned to Improve")) {
+       let maxDateStr = selectedRequest.completedDate;
+       if (!maxDateStr && selectedRequest.path) {
+           let maxTime = start.getTime();
+           selectedRequest.path.forEach(p => {
+               if (p.approvedAt) {
+                   const t = new Date(p.approvedAt).getTime();
+                   if (!isNaN(t) && t > maxTime) maxTime = t;
+               }
+           });
+           if (maxTime > start.getTime()) {
+               maxDateStr = new Date(maxTime).toISOString();
+           }
+       }
+       fallbackEnd = maxDateStr ? new Date(maxDateStr) : start;
+    }
+    const end = endStr ? new Date(endStr) : fallbackEnd;
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
     
     const diffMs = Math.max(0, end - start);
     const diffSecs = Math.floor(diffMs / 1000);
-    const hours = Math.floor(diffSecs / 3600);
+    const days = Math.floor(diffSecs / 86400);
+    const hours = Math.floor((diffSecs % 86400) / 3600);
     const mins = Math.floor((diffSecs % 3600) / 60);
     const secs = diffSecs % 60;
     
+    if (days > 0) return `${days}d ${hours}h ${mins}m ${secs}s`;
     if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
     if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
@@ -146,9 +167,17 @@ export default function TrackingPage() {
               });
               setRequests(myRequests);
               
-              // Select first if none selected
+              // Select from URL id or fallback to first
               setSelectedRequest(prev => {
-                if (!prev && myRequests.length > 0) return myRequests[0];
+                if (!prev) {
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const idFromUrl = urlParams.get("id");
+                  if (idFromUrl) {
+                    const found = myRequests.find(r => String(r.id) === idFromUrl);
+                    if (found) return found;
+                  }
+                  if (myRequests.length > 0) return myRequests[0];
+                }
                 return prev;
               });
             }
@@ -239,12 +268,15 @@ export default function TrackingPage() {
     );
   }
   return (
-    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden w-full h-[calc(100vh-120px)] animate-fadeIn">
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden w-full gap-6">
-          
+    <div className="flex min-h-screen bg-[#fafafb] dark:bg-[#0F1117] text-black">
+      <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+      <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+        <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} currentUser={currentUser} />
+        <div className="p-6 md:p-8 flex-1 w-full mx-auto">
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden w-full h-[calc(100vh-120px)] animate-fadeIn gap-6">
           {/* LEFT: Requests List */}
-          <div className="w-full lg:w-[380px] bg-white dark:bg-[#1c1c1e] rounded-xl shadow-sm border border-gray-200 dark:border-[#2c2c2e] flex flex-col flex-shrink-0 overflow-hidden">
-            <div className="p-5 border-b border-gray-100 dark:border-[#2c2c2e] bg-white dark:bg-[#1c1c1e]">
+          <div className="w-full lg:w-[380px] bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-200 dark:border-[#2A2F3A] flex flex-col flex-shrink-0 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 dark:border-[#2A2F3A] bg-white dark:bg-[#161B22]">
               <h1 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
                 <MapPin className="text-blue-600" size={22} />
                 {t('live_tracking')}
@@ -256,11 +288,11 @@ export default function TrackingPage() {
                   placeholder={t('search_tracking')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#161616] border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-colors font-medium text-gray-700"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-[#0B0D12] border border-gray-200 dark:border-[#2A2F3A] rounded-xl text-sm outline-none focus:border-blue-500 transition-colors font-medium text-gray-700 dark:text-gray-300"
                 />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50 dark:bg-[#161616]/50">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50 dark:bg-[#0B0D12]">
               {filteredRequests.length === 0 ? (
                 <div className="p-8 text-center text-gray-400">
                   <Package size={32} className="mx-auto mb-2 opacity-50" />
@@ -290,8 +322,8 @@ export default function TrackingPage() {
                               onClick={() => setSelectedRequest(req)}
                               className={`p-5 rounded-2xl cursor-pointer transition-all border ${
                                 isActive 
-                                  ? "bg-white dark:bg-[#2c2c2e] border-blue-500 shadow-md ring-1 ring-blue-50 dark:ring-blue-500/20" 
-                                  : "bg-white dark:bg-[#161616] border-transparent hover:border-gray-200 dark:hover:border-[#3f3f46] hover:shadow-sm"
+                                  ? "bg-white dark:bg-[#242B36] border-blue-500 shadow-md ring-1 ring-blue-50 dark:ring-blue-500/20" 
+                                  : "bg-white dark:bg-[#161B22] border-transparent hover:border-gray-200 dark:hover:border-[#2A2F3A] hover:shadow-sm"
                               }`}
                             >
                                <div className="flex justify-between items-start mb-3">
@@ -311,8 +343,8 @@ export default function TrackingPage() {
                                </div>
                                
                                <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
-                                  <p><span className="font-semibold text-gray-900 dark:text-white">Document Type:</span> {req.type || "Material Request"}</p>
-                                  <p><span className="font-semibold text-gray-900 dark:text-white">Title:</span> {req.title || req.subject || "1 Air Conditioner"}</p>
+                                  <p><span className="font-semibold text-gray-900 dark:text-white">Document Type:</span> {req.type}</p>
+                                  <p><span className="font-semibold text-gray-900 dark:text-white">Title:</span> {req.title || req.subject}</p>
                                   <p><span className="font-semibold text-gray-900 dark:text-white">Date:</span> {formattedDateString} at {finalTime}</p>
                                </div>
                             </div>
@@ -326,14 +358,14 @@ export default function TrackingPage() {
             </div>
           </div>
           {/* RIGHT: Tracker Map View */}
-          <div className="flex-1 bg-white dark:bg-[#1c1c1e] rounded-xl shadow-sm border border-gray-200 dark:border-[#2c2c2e] flex flex-col overflow-hidden relative">
+          <div className="flex-1 bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-200 dark:border-[#2A2F3A] flex flex-col overflow-hidden relative">
             {selectedRequest ? (
               <>
                 {/* Header of Tracker */}
-                <div className="p-6 md:p-8 border-b border-gray-100 dark:border-[#2c2c2e] bg-gradient-to-r from-blue-50/50 to-white dark:from-[#2c2c2e]/50 dark:to-[#1c1c1e] flex-shrink-0">
+                <div className="p-6 md:p-8 border-b border-gray-100 dark:border-[#2A2F3A] bg-gradient-to-r from-blue-50/50 to-white dark:from-[#242B36] dark:to-[#161B22] flex-shrink-0">
                   <div className="flex justify-between items-center mb-6">
                     <div>
-                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{selectedRequest.title || selectedRequest.subject || "1 Air Conditioner"}</h2>
+                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{selectedRequest.title || selectedRequest.subject}</h2>
                       <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{t('tracking_id')} <span className="text-blue-600 dark:text-blue-400 font-bold">{selectedRequest.trackingNumber || selectedRequest.id}</span></p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -342,8 +374,8 @@ export default function TrackingPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-[#2c2c2e] p-4 rounded-2xl border border-gray-100 dark:border-[#3f3f46] shadow-2xs flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#161616] flex items-center justify-center flex-shrink-0">
+                  <div className="bg-white dark:bg-[#0B0D12] p-4 rounded-2xl border border-gray-100 dark:border-[#2A2F3A] shadow-2xs flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#161B22] flex items-center justify-center flex-shrink-0">
                       <Package size={20} className="text-gray-500 dark:text-gray-400" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -358,7 +390,7 @@ export default function TrackingPage() {
                   </div>
                 </div>
                 {/* The Timeline Map */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-12 bg-[#f8fafc] dark:bg-[#161616] flex justify-center items-start">
+                <div className="flex-1 overflow-y-auto p-6 md:p-12 bg-[#f8fafc] dark:bg-[#0F1117] flex justify-center items-start">
                   
                   {!selectedRequest.path || selectedRequest.path.length === 0 ? (
                     <div className="text-center text-gray-400 italic mt-10">{t('no_path')}</div>
@@ -409,7 +441,7 @@ export default function TrackingPage() {
                         };
                         return (
                           <div className="relative w-full max-w-[160px] mx-auto py-12 mt-8 mb-24 overflow-visible">
-                            {(!isCompleted) && (
+                            {(!isCompleted && !isFailed) && (
                               <CurrentLocationMarker currentStep={currentStep} requestId={selectedRequest.id} />
                             )}
                             
@@ -460,12 +492,12 @@ export default function TrackingPage() {
                               })();
                               const pinColors = ['bg-[#E84B7D]', 'bg-[#F28F1D]', 'bg-[#9D8DF1]', 'bg-[#40A9FF]', 'bg-[#36CFC9]'];
                               const pinColorClass = pinColors[idx % pinColors.length];
-                              const lineColorClass = isPast || (isActive && isCompleted) ? "border-gray-900" : isActive && (isImprovement || isFailed) ? "border-red-600" : isActive ? "border-gray-900" : "border-gray-300";
+                              const lineColorClass = isPast || (isActive && isCompleted) ? "border-gray-900 dark:border-gray-400" : isActive && (isImprovement || isFailed) ? "border-red-600 dark:border-red-500" : isActive ? "border-gray-900 dark:border-gray-400" : "border-gray-300 dark:border-[#2A2F3A]";
                               const CardUI = () => (
-                                <div className={`w-[200px] bg-white dark:bg-[#2c2c2e] p-3.5 rounded-xl border-t border-r border-b border-l-4 transition-all shadow-sm hover:shadow-md ${
+                                <div className={`w-[200px] bg-white dark:bg-[#161B22] p-3.5 rounded-xl border-t border-r border-b border-l-4 transition-all shadow-sm hover:shadow-md ${
                                   isActive ? "border-l-blue-500 border-t-blue-100 dark:border-t-blue-500/20 border-r-blue-100 dark:border-r-blue-500/20 border-b-blue-100 dark:border-b-blue-500/20 shadow-blue-500/10" : 
-                                  isPast ? "border-l-gray-800 dark:border-l-gray-300 border-t-gray-100 dark:border-t-[#3f3f46] border-r-gray-100 dark:border-r-[#3f3f46] border-b-gray-100 dark:border-b-[#3f3f46]" :
-                                  "border-l-gray-300 dark:border-l-[#3f3f46] border-t-gray-100 dark:border-t-[#3f3f46] border-r-gray-100 dark:border-r-[#3f3f46] border-b-gray-100 dark:border-b-[#3f3f46]"
+                                  isPast ? "border-l-gray-800 dark:border-l-gray-400 border-t-gray-100 dark:border-t-[#2A2F3A] border-r-gray-100 dark:border-r-[#2A2F3A] border-b-gray-100 dark:border-b-[#2A2F3A]" :
+                                  "border-l-gray-300 dark:border-l-[#2A2F3A] border-t-gray-100 dark:border-t-[#2A2F3A] border-r-gray-100 dark:border-r-[#2A2F3A] border-b-gray-100 dark:border-b-[#2A2F3A]"
                                 }`}>
                                   <div className="flex flex-col gap-1.5 mb-4 text-left">
                                     <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200">
@@ -522,7 +554,7 @@ export default function TrackingPage() {
                                       {/* Pin on the Right (pointing left) */}
                                       <div className={`absolute right-[0px] translate-x-[45px] top-1/2 -translate-y-1/2 z-20`}>
                                         <div className={`w-[44px] h-[44px] rounded-tl-full rounded-tr-full rounded-br-full rounded-bl-none rotate-45 flex items-center justify-center shadow-md transition-colors duration-500 ${pinColorClass}`}>
-                                          <div className="w-[28px] h-[28px] bg-white dark:bg-[#1c1c1e] rounded-full -rotate-45 flex items-center justify-center shadow-inner">
+                                          <div className="w-[28px] h-[28px] bg-white dark:bg-[#0F1117] rounded-full -rotate-45 flex items-center justify-center shadow-inner">
                                             <span className="text-lg font-black text-gray-900 dark:text-white">{idx + 1}</span>
                                           </div>
                                         </div>
@@ -544,7 +576,7 @@ export default function TrackingPage() {
                                       {/* Pin on the Left (pointing right) */}
                                       <div className={`absolute left-[0px] -translate-x-[45px] top-1/2 -translate-y-1/2 z-20`}>
                                         <div className={`w-[44px] h-[44px] rounded-tl-full rounded-tr-full rounded-bl-full rounded-br-none -rotate-45 flex items-center justify-center shadow-md transition-colors duration-500 ${pinColorClass}`}>
-                                          <div className="w-[28px] h-[28px] bg-white dark:bg-[#1c1c1e] rounded-full rotate-45 flex items-center justify-center shadow-inner">
+                                          <div className="w-[28px] h-[28px] bg-white dark:bg-[#0F1117] rounded-full rotate-45 flex items-center justify-center shadow-inner">
                                             <span className="text-lg font-black text-gray-900 dark:text-white">{idx + 1}</span>
                                           </div>
                                         </div>
@@ -573,7 +605,9 @@ export default function TrackingPage() {
               </div>
             )}
           </div>
-      </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

@@ -41,6 +41,7 @@ export default function RequestPage() {
   const [formData, setFormData] = useState({
     documentType: "",
     title: "",
+    urgency: "Normal",
     description: ""
   });
   const [selectedFiles, setSelectedFiles] = useState([null, null, null]);
@@ -58,7 +59,7 @@ export default function RequestPage() {
     if (storedDocTypes) {
       let parsed = JSON.parse(storedDocTypes);
       const user = JSON.parse(userStr);
-      const isGlobalSuperAdmin = user?.email === "itcsuperadmin@rupp.edu.kh";
+      const isGlobalSuperAdmin = user?.email === "admin@rupp.edu.kh";
       const uDept = (user?.department || user?.mainRole || "IT Center").toLowerCase().trim();
       
       if (!isGlobalSuperAdmin) {
@@ -75,7 +76,7 @@ export default function RequestPage() {
   }, [router]);
   if (!isMounted) return null;
   // Filter requests based on user role/department
-  const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
+  const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
   const userDept = (currentUser?.mainRole || currentUser?.department || "").toLowerCase().trim();
   const filteredRequests = isGlobalSuperAdmin ? requests : requests.filter(req => {
     const sDept = (req.senderDepartment || "").toLowerCase().trim();
@@ -455,17 +456,33 @@ export default function RequestPage() {
                         </div>
                         <div className="flex-1">
                           <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
-                            {t("title") || "Title"} <span className="text-red-500">*</span>
+                            Urgency Level <span className="text-red-500">*</span>
                           </label>
-                          <input
-                            type="text"
-                            name="title"
-                            value={formData.title}
+                          <select
+                            name="urgency"
+                            value={formData.urgency}
                             onChange={handleInputChange}
-                            placeholder={`${t("title") || "Title"}....`}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 transition-colors"
-                          />
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 cursor-pointer text-gray-800 dark:text-[#a1a1aa] appearance-none"
+                            style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
+                          >
+                            <option value="Normal">Normal</option>
+                            <option value="High">High</option>
+                            <option value="Urgent">Urgent</option>
+                          </select>
                         </div>
+                      </div>
+                      <div className="w-full">
+                        <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
+                          {t("title") || "Title"} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="title"
+                          value={formData.title}
+                          onChange={handleInputChange}
+                          placeholder={`${t("title") || "Title"}....`}
+                          className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 transition-colors"
+                        />
                       </div>
                       <div className="w-full">
                         <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
@@ -628,16 +645,26 @@ export default function RequestPage() {
                   {/* Left Form Panel (Read Only) */}
                   <div className="w-full xl:w-[65%] flex flex-col gap-6">
                     {/* Top Inputs */}
-                    <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 shadow-sm flex flex-col md:flex-row gap-6">
-                      <div className="flex-1">
-                        <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
-                          {t("type_document")}
-                        </label>
-                        <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 font-medium">
-                          {selectedRequest.documentType}
+                    <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 shadow-sm flex flex-col gap-6">
+                      <div className="flex flex-col md:flex-row gap-6 w-full">
+                        <div className="flex-1">
+                          <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
+                            {t("type_document")}
+                          </label>
+                          <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 font-medium">
+                            {selectedRequest.documentType}
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
+                            Urgency Level
+                          </label>
+                          <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 font-medium">
+                            {selectedRequest.urgency || "Normal"}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex-1">
+                      <div className="w-full">
                         <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
                           {t("title") || "Title"}
                         </label>

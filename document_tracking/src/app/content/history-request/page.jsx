@@ -40,27 +40,13 @@ export default function HistoryPage() {
     const reqs = JSON.parse(localStorage.getItem("doc_tracking_requests") || "[]");
     
     // Filter requests based on user role
-    const isGlobalSuperAdmin = user.email === "itcsuperadmin@rupp.edu.kh";
+    const isGlobalSuperAdmin = user.email === "admin@rupp.edu.kh";
     const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
     
     const relevantRequests = reqs.filter(req => {
       if (isGlobalSuperAdmin) return true;
-      const isSender = (user.username && req.senderName === user.username) || 
-                       (user.email && req.senderEmail === user.email && user.email.trim() !== "") || 
-                       (userDept && req.senderDepartment && req.senderDepartment.toLowerCase().trim() === userDept);
-      
-      const isReceiver = (user.username && req.receiver === user.username) || 
-                         (user.email && req.receiverEmail === user.email && user.email.trim() !== "") || 
-                         (userDept && req.receiverDepartment && req.receiverDepartment.toLowerCase().trim() === userDept);
-                         
-      const inPath = userDept && Array.isArray(req.path) && req.path.some((step, index) => {
-         // Ignore steps that haven't been reached yet
-         if (index > (req.currentStepIndex || 0)) return false;
-         
-         const stepDept = typeof step === 'string' ? step.toLowerCase().trim() : (step.department || step.mainRole || "").toLowerCase().trim();
-         return stepDept === userDept;
-      });
-      return isSender || isReceiver || inPath;
+      const sDept = (req.senderDepartment || "").toLowerCase().trim();
+      return userDept && sDept === userDept;
     });
     
     relevantRequests.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
@@ -385,12 +371,10 @@ export default function HistoryPage() {
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('title') || 'Title'}</th>
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('sender')}</th>
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('receiver')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A] text-center">Status</th>
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A] text-center">{t('status')}</th>
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('priority')}</th>
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('date')}</th>
                     <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('duration') || 'Duration'}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('duration')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A]">
@@ -409,7 +393,7 @@ export default function HistoryPage() {
                     return (
                     <tr 
                       key={req.id} 
-                      onClick={() => router.push(`/content/tracking?id=${req.id}`)}
+                      onClick={() => router.push(`/content/tracking-document?id=${req.id}`)}
                       className="hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors cursor-pointer"
                     >
                       <td className="py-3 px-4 font-mono font-bold text-gray-500">{req.id || 'N/A'}</td>

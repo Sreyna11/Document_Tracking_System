@@ -4,6 +4,7 @@ export const km = {
   "create_request": "បង្កើតសំណើ",
   "sent": "បានបញ្ជូន",
   "tracking": "ការតាមដាន",
+  "tracking-document": "ការតាមដានឯកសារ",
   "received": "ទទួលបាន",
   "account": "គណនី",
   "role": "តួនាទី",

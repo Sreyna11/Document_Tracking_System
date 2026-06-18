@@ -44,23 +44,43 @@ export default function RegisterPage() {
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center px-4 py-8"
+      className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8 select-none"
       style={{ backgroundColor: "#0c3f0d" }}
     >
-      <div className="w-full max-w-[420px]">
-        <div
-          className="rounded-2xl shadow-xl overflow-hidden animate-fade-in"
-          style={{ backgroundColor: "#ffffff" }}
-        >
-          <div className="px-8 pt-8 pb-6">
-            <div className="fade-up">
-              
+      <div className="w-full max-w-[820px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[500px] md:min-h-[550px] fade-up animate-fade-in">
+        {/* Left Side: Branding / Logo (Friendly, fitting, 1/2 width) */}
+        <div className="w-full md:w-1/2 bg-white p-8 md:p-10 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-gray-100">
+          <div className="relative flex justify-center items-center mb-6">
+            <div className="absolute w-36 h-36 md:w-44 md:h-44 bg-green-500/5 rounded-full blur-2xl pointer-events-none" />
+            <img
+              src="/rupp-logo-transparent.png"
+              alt="Royal University of Phnom Penh Logo"
+              className="relative w-40 h-40 md:w-48 md:h-48 object-contain"
+            />
+          </div>
+          <div className="space-y-3.5 max-w-[280px]">
+            <div className="space-y-1.5">
+              <h2 className="text-[#0c3f0d] text-base md:text-lg font-bold leading-tight font-moul" style={{ fontFamily: "'Moul', 'Inter', sans-serif" }}>
+                សាកលវិទ្យាល័យភូមិន្ទភ្នំពេញ
+              </h2>
+              <h1 className="text-gray-600 text-xs md:text-sm font-semibold leading-tight">
+                Royal University of Phnom Penh
+              </h1>
             </div>
-
-            <div className="fade-up fade-up-1 mb-5 text-center">
-              <span className="inline-block bg-green-50 text-green-700 text-[11px] font-semibold uppercase tracking-widest px-4 py-1.5 rounded-full border border-green-100">
-                Create Account
-              </span>
+          </div>
+        </div>
+        {/* Right Side: Form (1/2 width) */}
+        <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-between bg-white min-h-[400px] md:min-h-0">
+          <div className="my-auto w-full">
+            <div className="mb-6 text-center">
+              <h3 className="text-lg md:text-xl font-extrabold text-[#0c3f0d] uppercase">
+                Document Tracking System
+              </h3>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="inline-block bg-green-50 text-green-700 text-[12px] font-bold px-2.5 py-0.5 rounded-full border border-green-100">
+                  Create Account
+                </span>
+              </div>
             </div>
 
             {success ? (
@@ -179,17 +199,20 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <div className="px-8 py-4 border-t border-gray-100 bg-gray-50 text-center">
-            <p className="text-[13px] text-green-700">
+          <div className="fade-up fade-up-4 mt-6 text-center">
+            <p className="text-[13px] text-green-800">
               Already have an account?{" "}
-              <Link href="/" className="font-semibold text-green-800 hover:text-green-900 underline underline-offset-2 transition-colors">
+              <Link href="/" className="font-bold text-[#0c3f0d] hover:text-green-700 underline underline-offset-2 transition-colors">
                 Sign in here
               </Link>
             </p>
           </div>
         </div>
+      </div>
 
-        <p className="text-center text-[11px] text-green-100 mt-5 opacity-70">
+      {/* Subtle Footer */}
+      <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
+        <p className="text-[11px] font-medium text-green-100/60">
           © {new Date().getFullYear()} Royal University of Phnom Penh. All rights reserved.
         </p>
       </div>

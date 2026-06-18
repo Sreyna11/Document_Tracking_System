@@ -11,7 +11,8 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
-  FileText
+  FileText,
+  History
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLanguage } from "../app/context/LanguageContext";
@@ -29,6 +30,7 @@ export default function Sidebar({
     settings: true,
     rolePermission: true
   });
+  const [receiveCount, setReceiveCount] = useState(0);
   const toggleMenu = (menu) => {
     setOpenMenus((prev) => ({ ...prev, [menu]: !prev[menu] }));
   };
@@ -38,7 +40,68 @@ export default function Sidebar({
       setCurrentUser(JSON.parse(userStr));
     }
   }, []);
-  const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
+
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const calculateUnreadReceive = (storageData) => {
+      try {
+        let requests = storageData ? JSON.parse(storageData) : [];
+        if (!Array.isArray(requests)) return;
+        
+        const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+        const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
+        
+        let list = requests.filter((req) => {
+            const isAssignedToMeForImprovement = req.status?.toLowerCase().trim() === "assigned to improve" && (req.improveAssignedTo || "").toLowerCase().trim() === userDept;
+            if (isAssignedToMeForImprovement) return true;
+            const isDeclinedToMe = req.status?.toLowerCase().trim() === "failed" && (req.senderDepartment || "").toLowerCase().trim() === userDept;
+            if (isDeclinedToMe) return true;
+            const isCompletedToMe = req.status?.toLowerCase().trim() === "completed" && (req.senderDepartment || "").toLowerCase().trim() === userDept;
+            if (isCompletedToMe) return true;
+            
+            if ((req.senderDepartment || "").toLowerCase().trim() === userDept) return false;
+            if (isGlobalSuperAdmin) return true;
+            if (!req.path) return false;
+            
+            const myIndex = req.path.findIndex(p => {
+                const role = typeof p === 'string' ? p : p.department || p.mainRole;
+                return role && role.toLowerCase().trim() === userDept;
+            });
+            if (myIndex === -1) return false;
+            const currentIndex = req.currentStepIndex !== undefined ? req.currentStepIndex : 0;
+            return currentIndex >= myIndex;
+        });
+        
+        const userId = currentUser?.email || currentUser?.username || userDept;
+        const unreadList = list.filter(req => !(req.readBy || []).includes(userId));
+        
+        setReceiveCount(unreadList.length);
+      } catch (e) {
+        console.error("Error calculating unread receive", e);
+      }
+    };
+
+    calculateUnreadReceive(localStorage.getItem("doc_tracking_requests"));
+
+    const handleStorageChange = (e) => {
+      if (e.key === "doc_tracking_requests") {
+        calculateUnreadReceive(e.newValue);
+      }
+    };
+    
+    const interval = setInterval(() => {
+      calculateUnreadReceive(localStorage.getItem("doc_tracking_requests"));
+    }, 1000);
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [currentUser]);
+
+  const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
   const adminCheckStr = (currentUser?.type || currentUser?.role || "").toLowerCase();
   const isDepartmentAdmin = adminCheckStr.includes("super admin") || adminCheckStr === "admin";
   const isSuperAdmin = currentUser && (isGlobalSuperAdmin || isDepartmentAdmin);
@@ -59,7 +122,7 @@ export default function Sidebar({
           </button>
           <div className="flex items-center gap-3 mb-6">
             <img
-              src="/rupp-logo-transparent.png"
+              src="/rupp-logo-transparent.png?v=2"
               alt="Royal University of Phnom Penh Logo"
               className="w-10 h-10 object-contain"
             />
@@ -83,21 +146,20 @@ export default function Sidebar({
           {/* Dashboard */}
           <button
             onClick={() => router.push("/content/dashboard")}
-            className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[14px] transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[15px] transition-all duration-200 cursor-pointer ${
               pathname === "/content/dashboard"
                 ? "bg-[#0c3f0d] text-white font-bold"
                 : "text-gray-600 hover:bg-gray-100/50 hover:text-gray-900"
             }`}
           >
             <LayoutDashboard size={18} className={`${pathname === "/content/dashboard" ? "text-white" : "text-gray-400"}`} />
-            <span>Dashboard</span>
             <span>{t("dashboard")}</span>
           </button>
           {/* Document Flow */}
           <div className="pt-2">
             <button
               onClick={() => toggleMenu("documentFlow")}
-              className="w-full flex items-center justify-between px-3 py-2 text-[14px] font-medium text-gray-800 dark:text-white hover:bg-gray-100/50 dark:hover:bg-[#242B36] rounded-lg cursor-pointer"
+              className="w-full flex items-center justify-between px-3 py-2 text-[15px] font-medium text-gray-800 dark:text-white hover:bg-gray-100/50 dark:hover:bg-[#242B36] rounded-lg cursor-pointer"
             >
               <span>Document Flow</span>
               {openMenus.documentFlow ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
@@ -106,10 +168,11 @@ export default function Sidebar({
             {openMenus.documentFlow && (
               <div className="mt-1 space-y-0.5">
                 {[
-                  { name: "Request", path: "/content/create-request", icon: FileText },
-                  { name: "Receive", path: "/content/received", icon: Inbox },
-                  { name: "Tracking Document", path: "/content/tracking", icon: MapPin },
-                  { name: "Document Type", path: "/content/type-document", icon: FolderCog }
+                  { name: "Request", path: "/content/request", icon: FileText },
+                  { name: "Receive", path: "/content/receive", icon: Inbox },
+                  { name: "History Request", path: "/content/history-request", icon: History },
+                  { name: "Tracking Document", path: "/content/tracking-document", icon: MapPin },
+                  { name: "Document Type", path: "/content/document-type", icon: FolderCog }
                 ].filter(item => hasPermission(currentUser, item.name, "View")).map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.path;
@@ -117,15 +180,21 @@ export default function Sidebar({
                     <button
                       key={item.name}
                       onClick={() => router.push(item.path)}
-                      className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[14px] transition-all duration-200 cursor-pointer relative ${
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg font-medium text-[15px] transition-all duration-200 cursor-pointer relative ${
                         isActive
                           ? "bg-[#0c3f0d] text-white font-bold"
                           : "text-gray-600 dark:text-[#a1a1aa] hover:bg-gray-100/50 dark:hover:bg-[#242B36] hover:text-gray-900 dark:hover:text-white"
                       }`}
                     >
-                      <Icon size={18} className={`${isActive ? "text-white" : "text-gray-400"}`} />
-                      <span>{item.name}</span>
-                      <span>{t(item.name === "Request" ? "create_request" : item.name === "Receive" ? "received" : item.name === "Tracking Document" ? "tracking" : "type_document")}</span>
+                      <div className="flex items-center gap-3.5">
+                        <Icon size={18} className={`${isActive ? "text-white" : "text-gray-400"}`} />
+                        <span>{t(item.name === "Request" ? "request" : item.name === "Receive" ? "receive" : item.name === "History Request" ? "history_requests" : item.name === "Tracking Document" ? "tracking-document" : "type_document") || item.name}</span>
+                      </div>
+                      {item.name === "Receive" && receiveCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[20px]">
+                          {receiveCount > 99 ? '99+' : receiveCount}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -136,7 +205,7 @@ export default function Sidebar({
           <div className="pt-2">
               <button
                 onClick={() => toggleMenu("settings")}
-                className="w-full flex items-center justify-between px-3 py-2 text-[14px] font-medium text-gray-800 dark:text-white hover:bg-gray-100/50 dark:hover:bg-[#242B36] rounded-lg cursor-pointer"
+                className="w-full flex items-center justify-between px-3 py-2 text-[15px] font-medium text-gray-800 dark:text-white hover:bg-gray-100/50 dark:hover:bg-[#242B36] rounded-lg cursor-pointer"
               >
                 <span>Settings</span>
                 {openMenus.settings ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
@@ -147,23 +216,30 @@ export default function Sidebar({
                   {hasPermission(currentUser, "Account", "View") && (
                     <button
                       onClick={() => router.push("/content/account")}
-                      className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[14px] transition-all duration-200 cursor-pointer relative z-10 ${
+                      className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[15px] transition-all duration-200 cursor-pointer relative z-10 ${
                         pathname === "/content/account"
                           ? "bg-[#0c3f0d] text-white font-bold"
                           : "text-gray-600 hover:bg-gray-100/50 hover:text-gray-900"
                       }`}
                     >
                       <Users size={18} className={pathname === "/content/account" ? "text-white" : "text-gray-400"} />
-                      <span>Account</span>
                       <span>{t("account")}</span>
                     </button>
                   )}
                   {/* Role & Permission Collapsible */}
-                  {isSuperAdmin && (
-                    <div className="relative">
+                  {(() => {
+                    const roleItems = [
+                      { name: "Job Department", path: "/content/job-department" },
+                      { name: "Set Role Permission", path: "/content/set-role-permission" }
+                    ].filter(item => hasPermission(currentUser, item.name, "View"));
+                    
+                    if (roleItems.length === 0) return null;
+                    
+                    return (
+                      <div className="relative">
                       <button
                         onClick={() => toggleMenu("rolePermission")}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg font-medium text-[14px] transition-all duration-200 cursor-pointer relative z-10 text-gray-600 hover:bg-gray-100/50 hover:text-gray-900`}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg font-medium text-[15px] transition-all duration-200 cursor-pointer relative z-10 text-gray-600 hover:bg-gray-100/50 hover:text-gray-900`}
                       >
                         <div className="flex items-center gap-3.5">
                           <ShieldCheck size={18} className="text-gray-400" />
@@ -175,16 +251,13 @@ export default function Sidebar({
                       {openMenus.rolePermission && (
                         <div className="mt-1 relative">
                           <div className="absolute left-[19px] top-[20px] bottom-[20px] w-[1px] bg-gray-200 dark:bg-[#242B36] z-0"></div>
-                          {[
-                            { name: "Job Department", path: "/content/job-department" },
-                            { name: "Set Role Permission", path: "/content/set-role-permission" }
-                          ].filter(item => hasPermission(currentUser, item.name, "View")).map((item) => {
+                            {roleItems.map((item) => {
                             const isActive = pathname === item.path;
                             return (
                               <button
                                 key={item.name}
                                 onClick={() => router.push(item.path)}
-                                className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[13px] transition-all duration-200 cursor-pointer relative z-10 ${
+                                className={`w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg font-medium text-[14px] transition-all duration-200 cursor-pointer relative z-10 ${
                                   isActive
                                     ? "bg-[#0c3f0d] text-white font-bold"
                                     : "text-gray-500 dark:text-[#a1a1aa] hover:bg-gray-100/50 dark:hover:bg-[#242B36] hover:text-gray-900 dark:hover:text-white"
@@ -193,15 +266,15 @@ export default function Sidebar({
                                 <div className="w-5 flex justify-center items-center">
                                   <div className={`w-1.5 h-1.5 rounded-full border-[1.5px] ${isActive ? "border-white bg-[#0c3f0d]" : "border-gray-300 bg-white"}`}></div>
                                 </div>
-                                <span>{item.name}</span>
-                                <span>{t(item.name === "Job Department" ? "department" : "role")}</span>
+                                <span>{t(item.name === "Job Department" ? "job_department" : "set_role_permission")}</span>
                               </button>
                             );
                           })}
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
             </div>
