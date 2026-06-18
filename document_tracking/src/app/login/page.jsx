@@ -118,10 +118,9 @@ export default function LoginPage() {
             style={{ backgroundColor: "#0c3f0d" }}
         >
             <div className="w-full max-w-[820px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[500px] md:min-h-[550px] fade-up animate-fade-in">
-                {/* Left Side: Branding / Logo (Friendly, fitting, 1/2 width) */}
+                {/* Left Side: Branding / Logo */}
                 <div className="w-full md:w-1/2 bg-white p-8 md:p-10 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-gray-100">
                     <div className="relative flex justify-center items-center mb-6">
-                        {/* Soft warm green ambient glow */}
                         <div className="absolute w-36 h-36 md:w-44 md:h-44 bg-green-500/5 rounded-full blur-2xl pointer-events-none" />
                         <img
                             src="/rupp-logo-transparent.png"
@@ -143,7 +142,7 @@ export default function LoginPage() {
                         
                     </div>
                 </div>
-                {/* Right Side: Form (1/2 width) */}
+                {/* Right Side: Form  */}
                 <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-between bg-white min-h-[400px] md:min-h-0">
                     <div className="my-auto w-full">
                         <div className="mb-6 text-center">
@@ -158,7 +157,7 @@ export default function LoginPage() {
                         </div>
                         <form onSubmit={handleSubmit} noValidate className="space-y-4">
                             <div className="fade-up fade-up-2">
-                                <label className="block text-[13px] font-semibold text-green-800 mb-1">
+                                <label className="block text-[14px] font-semibold text-green-800 mb-1">
                                     Email Address / Username
                                 </label>
                                 <div className="relative">
@@ -175,7 +174,7 @@ export default function LoginPage() {
                             </div>
                             <div className="fade-up fade-up-3">
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-[13px] font-semibold text-green-800">
+                                    <label className="block text-[14px] font-semibold text-green-800">
                                         Password
                                     </label>
                                     
@@ -236,7 +235,7 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => router.push("/register")}
-                                    className="w-full py-2.5 bg-white border border-gray-200 hover:border-[#16a34a]/30 hover:bg-[#16a34a]/5 text-[#0c3f0d] font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+                                    className="w-full py-2.5 bg-white border border-gray-200 hover:border-[#16a34a]/30 hover:bg-[#16a34a]/5 text-[#0c3f0d] font-bold text-[14px] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
                                 >
                                     <UserPlus size={14} className="text-[#16a34a]" />
                                     Create an account

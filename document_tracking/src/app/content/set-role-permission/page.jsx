@@ -250,11 +250,11 @@ export default function SetRolePermissionPage() {
               </div>
               {/* Right Column: Permissions Matrix */}
               <div className="flex-1 overflow-x-auto h-fit sticky top-6">
-                <div className="bg-white dark:bg-[#161B22] rounded-md shadow-sm border border-gray-200 dark:border-[#2A2F3A] flex flex-col overflow-hidden w-full min-w-max lg:min-w-0">
-                  <table className="w-full text-left border-collapse text-[13px]">
+                <div className="bg-white dark:bg-[#161B22] rounded-md shadow-sm border border-gray-200 dark:border-[#374151] flex flex-col overflow-hidden w-full min-w-max lg:min-w-0">
+                  <table className="w-full text-left border-collapse text-[15px]">
                     <thead className="bg-white dark:bg-[#161B22]">
-                      <tr className="border-b border-gray-200 dark:border-[#2A2F3A]">
-                        <th className="py-4 px-6 font-medium text-black dark:text-white border-r border-gray-100 dark:border-[#2A2F3A] w-[35%]">
+                      <tr className="border-b border-gray-200 dark:border-[#374151]">
+                        <th className="py-4 px-6 font-medium text-black dark:text-white border-r border-gray-100 dark:border-[#374151] w-[35%]">
                           <div className="flex items-center justify-between">
                             <span>{t('menu')}</span>
                             <div className="flex items-center gap-2 cursor-pointer group" onClick={handleSelectAll}>
@@ -265,7 +265,7 @@ export default function SetRolePermissionPage() {
                                     }`}>
                                       {isAllSelected && <Check size={18} className="text-[#5ca95c] relative top-[-1px] right-[-1px]" strokeWidth={3} />}
                                </div>
-                               <span className="text-[13px] font-normal text-gray-600 dark:text-[#a1a1aa]">{t('select_all')}</span>
+                               <span className="text-[15px] font-normal text-gray-600 dark:text-[#a1a1aa]">{t('select_all')}</span>
                             </div>
                           </div>
                         </th>
@@ -274,12 +274,12 @@ export default function SetRolePermissionPage() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A] bg-white dark:bg-[#161B22] text-gray-700 dark:text-white">
+                    <tbody className="divide-y divide-gray-100 dark:divide-[#374151] bg-white dark:bg-[#161B22] text-gray-700 dark:text-white">
                       {menus.map((menu, mIdx) => {
                         const menuPerms = currentPermissions[menu] || {};
                         return (
                           <tr key={mIdx} className="hover:bg-gray-50 dark:bg-[#0F1117]/50 dark:hover:bg-[#242B36]/50">
-                            <td className="py-4 px-6   font-semibold border-r border-gray-100 dark:border-[#2A2F3A]">
+                            <td className="py-4 px-6   font-semibold border-r border-gray-100 dark:border-[#374151]">
                               {t(menu === "Request" ? "create_request" : menu === "Receive" ? "received" : menu === "Tracking Document" ? "tracking" : menu === "Account" ? "account" : menu === "Job Department" ? "job_department" : menu === "Set Role Permission" ? "set_role_permission" : menu === "Type Document" ? "type_document" : menu)}
                             </td>
                             {actions.map((action, aIdx) => {

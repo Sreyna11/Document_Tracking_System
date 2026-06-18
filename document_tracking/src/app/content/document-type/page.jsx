@@ -319,9 +319,9 @@ export default function DocumentTypePage() {
                               return (
                                 <div key={idx} className="relative pl-8">
                                   {/* Green Dot Indicator */}
-                                  <div className="absolute w-[18px] h-[18px] rounded-full bg-[#1a5b28] dark:bg-[#2da94a] -left-[9px] top-1/2 -translate-y-1/2 z-10"></div>
+                                  <div className="absolute w-[18px] h-[18px] rounded-full bg-[#1a5b28] dark:bg-[#2da94a] -left-[9px] top-[35px] -translate-y-1/2 z-10"></div>
                                   {!isFinal && (
-                                    <div className="absolute left-[-1px] top-1/2 w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
+                                    <div className="absolute left-[-1px] top-[35px] w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
                                   )}
                                   
                                   {/* Step Info Box */}

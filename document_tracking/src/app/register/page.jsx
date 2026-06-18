@@ -69,7 +69,7 @@ export default function RegisterPage() {
             </div>
           </div>
         </div>
-        {/* Right Side: Form (1/2 width) */}
+        {/* Right Side: Form */}
         <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-between bg-white min-h-[400px] md:min-h-0">
           <div className="my-auto w-full">
             <div className="mb-6 text-center">
@@ -97,7 +97,7 @@ export default function RegisterPage() {
             ) : (
               <form onSubmit={handleSubmit} noValidate>
                 <div className="fade-up fade-up-2 mb-4">
-                  <label className="block text-[12px] font-semibold text-green-800 mb-1.5 uppercase tracking-wider">
+                  <label className="block text-[14px] font-semibold text-green-800 mb-1.5">
                     Username
                   </label>
                   <div className="relative">
@@ -114,7 +114,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="fade-up fade-up-2 mb-4">
-                  <label className="block text-[12px] font-semibold text-green-800 mb-1.5 uppercase tracking-wider">
+                  <label className="block text-[14px] font-semibold text-green-800 mb-1.5">
                     Email Address
                   </label>
                   <div className="relative">
@@ -131,7 +131,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="fade-up fade-up-3 mb-4">
-                  <label className="block text-[12px] font-semibold text-green-800 mb-1.5 uppercase tracking-wider">
+                  <label className="block text-[14px] font-semibold text-green-800 mb-1.5">
                     Password
                   </label>
                   <div className="relative">
@@ -157,7 +157,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="fade-up fade-up-3 mb-5">
-                  <label className="block text-[12px] font-semibold text-green-800 mb-1.5 uppercase tracking-wider">
+                  <label className="block text-[14px] font-semibold text-green-800 mb-1.5">
                     Confirm Password
                   </label>
                   <div className="relative">

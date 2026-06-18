@@ -26,11 +26,13 @@ export default function RequestPage() {
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   // Custom Delete Confirmation State
   const [deleteModalConfig, setDeleteModalConfig] = useState({
     isOpen: false,
     isBulk: false,
     id: null,
+    title: "",
   });
   // Alert Modal State
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "" });
@@ -205,8 +207,8 @@ export default function RequestPage() {
     setSelectedRequest(null);
     setViewState("LIST");
   };
-  const handleDeleteRequest = (id) => {
-    setDeleteModalConfig({ isOpen: true, isBulk: false, id: id });
+  const handleDeleteRequest = (req) => {
+    setDeleteModalConfig({ isOpen: true, isBulk: false, id: req.id, title: req.title });
   };
   const handleSelectAll = () => {
     setSelectedRows(filteredRequests.map(r => r.id));
@@ -216,7 +218,7 @@ export default function RequestPage() {
   };
   const handleDeleteSelected = () => {
     if (selectedRows.length > 0) {
-      setDeleteModalConfig({ isOpen: true, isBulk: true, id: null });
+      setDeleteModalConfig({ isOpen: true, isBulk: true, id: null, title: "" });
     }
   };
   const confirmDelete = () => {
@@ -231,7 +233,7 @@ export default function RequestPage() {
       localStorage.setItem("doc_tracking_requests", JSON.stringify(updatedList));
       setSelectedRows(prev => prev.filter(rowId => rowId !== deleteModalConfig.id));
     }
-    setDeleteModalConfig({ isOpen: false, isBulk: false, id: null });
+    setDeleteModalConfig({ isOpen: false, isBulk: false, id: null, title: "" });
   };
   const toggleRowSelection = (id) => {
     setSelectedRows(prev =>
@@ -390,7 +392,7 @@ export default function RequestPage() {
                                           )}
                                           {hasPermission(currentUser, "Request", "Delete") && (
                                             <button
-                                              onClick={() => { setActionMenuOpen(null); handleDeleteRequest(req.id); }}
+                                              onClick={() => { setActionMenuOpen(null); handleDeleteRequest(req); }}
                                               className="w-full text-left px-4 py-2 text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                                             >
                                               <Trash2 size={14} /> {t("delete")}
@@ -426,7 +428,7 @@ export default function RequestPage() {
                   <h1 className="text-3xl font-bold text-black dark:text-white">{t("create_request")}</h1>
                   <button
                     onClick={cancelCreate}
-                    className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
+                    className="px-6 py-2 bg-gray-600 hover:bg-gray-700 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
                   >
                     {t("back") || "Back"}
                   </button>
@@ -445,7 +447,7 @@ export default function RequestPage() {
                             name="documentType"
                             value={formData.documentType}
                             onChange={handleDocTypeChange}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 cursor-pointer text-gray-600 dark:text-[#a1a1aa] appearance-none"
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 cursor-pointer text-black dark:text-white appearance-none"
                             style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
                           >
                             <option value="" disabled>{t("type_document")}...</option>
@@ -462,12 +464,12 @@ export default function RequestPage() {
                             name="urgency"
                             value={formData.urgency}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 cursor-pointer text-gray-800 dark:text-[#a1a1aa] appearance-none"
+                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 cursor-pointer text-black dark:text-white appearance-none"
                             style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
                           >
-                            <option value="Normal">Normal</option>
-                            <option value="High">High</option>
-                            <option value="Urgent">Urgent</option>
+                            <option value="Normal">{t("normal")}</option>
+                            <option value="High">{t("high")}</option>
+                            <option value="Urgent">{t("urgent")}</option>
                           </select>
                         </div>
                       </div>
@@ -481,7 +483,7 @@ export default function RequestPage() {
                           value={formData.title}
                           onChange={handleInputChange}
                           placeholder={`${t("title") || "Title"}....`}
-                          className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 transition-colors"
+                          className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 transition-colors text-black dark:text-white"
                         />
                       </div>
                       <div className="w-full">
@@ -493,7 +495,7 @@ export default function RequestPage() {
                           value={formData.description}
                           onChange={handleInputChange}
                           placeholder={t("write_something")}
-                          className="w-full px-4 py-3 min-h-[140px] rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 transition-colors resize-y"
+                          className="w-full px-4 py-3 min-h-[140px] rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[15px] bg-gray-50 dark:bg-[#242B36]/50 transition-colors text-black dark:text-white resize-y"
                         />
                       </div>
                     </div>
@@ -515,10 +517,10 @@ export default function RequestPage() {
                             />
                             {file ? (
                               <>
-                                <div className="w-12 h-12 rounded-full bg-[#1a5b28]/10 flex items-center justify-center mb-4 text-[#1a5b28]">
+                                <div className="w-12 h-12 rounded-full bg-[#1a5b28]/10 dark:bg-[#2da94a]/10 flex items-center justify-center mb-4 text-[#1a5b28] dark:text-[#2da94a]">
                                   <FileText size={24} />
                                 </div>
-                                <p className="text-[14px] font-bold text-gray-800 truncate w-full px-2" title={file.name}>
+                                <p className="text-[14px] font-bold text-gray-800 dark:text-white truncate w-full px-2" title={file.name}>
                                   {file.name}
                                 </p>
                                 <p className="text-[12px] text-gray-500 dark:text-[#a1a1aa] mt-1">
@@ -548,7 +550,7 @@ export default function RequestPage() {
                           onClick={saveRequest}
                           className="px-10 py-2.5 bg-[#125821] hover:bg-[#0c4015] text-white text-[15px] font-bold rounded-md transition-colors"
                         >
-                          {t("save_changes") || "Save"}
+                          {t("save") || "Save"}
                         </button>
                       ) : null}
                       <button
@@ -577,20 +579,20 @@ export default function RequestPage() {
                               <div key={idx} className="relative pl-8">
                                 {/* Dot Indicator - Using Pending Color as requested */}
                                 <div
-                                  className="absolute w-[18px] h-[18px] rounded-full -left-[9px] top-1/2 -translate-y-1/2 z-10"
+                                  className="absolute w-[18px] h-[18px] rounded-full -left-[9px] top-[35px] -translate-y-1/2 z-10"
                                   style={{ backgroundColor: PENDING_COLOR }}
                                 ></div>
                                 {!isFinal && (
-                                  <div className="absolute left-[-1px] top-1/2 w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
+                                  <div className="absolute left-[-1px] top-[35px] w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
                                 )}
                                 {/* Step Info Box */}
-                                <div className="bg-gray-50 dark:bg-[#242B36]/80 border border-[#1a5b28] rounded-xl px-4 py-3 flex justify-between items-center relative w-full">
+                                <div className="bg-gray-50 dark:bg-[#242B36]/80 border border-[#1a5b28] dark:border-[#2da94a] rounded-xl px-4 py-3 flex justify-between items-center relative w-full">
                                   <div className="flex flex-col gap-1.5">
                                     <div className="text-[13px] font-bold text-black dark:text-white">
-                                      {t("department")} : <span className="text-[#1a5b28] font-normal">{step.department}</span>
+                                      {t("department")} : <span className="text-[#1a5b28] dark:text-[#2da94a] font-normal">{step.department}</span>
                                     </div>
                                     <div className="text-[13px] font-bold text-black dark:text-white">
-                                      {t("signature_by")} : <span className="text-[#1a5b28] font-normal">{step.userSign}</span>
+                                      {t("signature_by")} : <span className="text-[#1a5b28] dark:text-[#2da94a] font-normal">{step.userSign}</span>
                                     </div>
                                   </div>
                                   {isFinal && (
@@ -636,7 +638,7 @@ export default function RequestPage() {
                   <h1 className="text-3xl font-bold text-black dark:text-white">{t("view_request")}</h1>
                   <button
                     onClick={cancelCreate}
-                    className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
+                    className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
                   >
                     {t("back") || "Back"}
                   </button>
@@ -651,7 +653,7 @@ export default function RequestPage() {
                           <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
                             {t("type_document")}
                           </label>
-                          <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 font-medium">
+                          <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 dark:text-white font-medium">
                             {selectedRequest.documentType}
                           </div>
                         </div>
@@ -659,7 +661,7 @@ export default function RequestPage() {
                           <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
                             Urgency Level
                           </label>
-                          <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 font-medium">
+                          <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 dark:text-white font-medium">
                             {selectedRequest.urgency || "Normal"}
                           </div>
                         </div>
@@ -668,7 +670,7 @@ export default function RequestPage() {
                         <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
                           {t("title") || "Title"}
                         </label>
-                        <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 font-medium">
+                        <div className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/50 text-[15px] text-gray-800 dark:text-white font-medium">
                           {selectedRequest.title}
                         </div>
                       </div>
@@ -684,10 +686,10 @@ export default function RequestPage() {
                               key={idx}
                             className="border-[1.5px] border-dashed border-gray-300 dark:border-[#2A2F3A] bg-gray-50 dark:bg-[#242B36]/30 rounded-lg p-8 flex flex-col items-center justify-center text-center h-48 relative overflow-hidden"
                           >
-                            <div className="w-12 h-12 rounded-full bg-[#1a5b28]/10 flex items-center justify-center mb-4 text-[#1a5b28]">
+                            <div className="w-12 h-12 rounded-full bg-[#1a5b28]/10 dark:bg-[#2da94a]/10 flex items-center justify-center mb-4 text-[#1a5b28] dark:text-[#2da94a]">
                               <FileText size={24} />
                             </div>
-                            <p className="text-[14px] font-bold text-gray-800 truncate w-full px-2" title={file.name}>
+                            <p className="text-[14px] font-bold text-gray-800 dark:text-white truncate w-full px-2" title={file.name}>
                               {file.name}
                             </p>
                             <p className="text-[12px] text-gray-500 dark:text-[#a1a1aa] mt-1">
@@ -779,21 +781,21 @@ export default function RequestPage() {
                             <div key={idx} className="relative pl-8">
                               {/* Dot Indicator */}
                               <div
-                                className="absolute w-[18px] h-[18px] rounded-full -left-[9px] top-1/2 -translate-y-1/2 z-10"
+                                className="absolute w-[18px] h-[18px] rounded-full -left-[9px] top-[35px] -translate-y-1/2 z-10"
                                 style={{ backgroundColor: dotColor }}
                               ></div>
                               {!isFinal && (
-                                <div className="absolute left-[-1px] top-1/2 w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
+                                <div className="absolute left-[-1px] top-[35px] w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
                               )}
                               {/* Step Info Box */}
-                              <div className="bg-gray-50 dark:bg-[#242B36]/80 border border-[#1a5b28] rounded-xl px-4 py-3 flex flex-col relative w-full">
+                              <div className="bg-gray-50 dark:bg-[#242B36]/80 border border-[#1a5b28] dark:border-[#2da94a] rounded-xl px-4 py-3 flex flex-col relative w-full">
                                 <div className="flex justify-between items-start w-full">
                                   <div className="flex flex-col gap-1.5">
                                     <div className="text-[13px] font-bold text-black dark:text-white">
-                                      {t("department")} : <span className="text-[#1a5b28] font-normal">{stepDept}</span>
+                                      {t("department")} : <span className="text-[#1a5b28] dark:text-[#2da94a] font-normal">{stepDept}</span>
                                     </div>
                                     <div className="text-[13px] font-bold text-black dark:text-white">
-                                      {t("signature_by")} : <span className="text-[#1a5b28] font-normal">{stepUser}</span>
+                                      {t("signature_by")} : <span className="text-[#1a5b28] dark:text-[#2da94a] font-normal">{stepUser}</span>
                                     </div>
                                   </div>
                                   {isFinal && (
@@ -879,10 +881,10 @@ export default function RequestPage() {
   {/* Delete Confirmation Modal */ }
   <DeleteConfirmationModal
     isOpen={deleteModalConfig.isOpen}
-    onClose={() => setDeleteModalConfig({ isOpen: false, isBulk: false, id: null })}
+    onClose={() => setDeleteModalConfig({ isOpen: false, isBulk: false, id: null, title: "" })}
     onConfirm={confirmDelete}
     itemCount={deleteModalConfig.isBulk ? selectedRows.length : 1}
-    itemName={""}
+    itemName={deleteModalConfig.title || ""}
     itemType="requests"
   />
   {/* Custom Alert Modal */}
