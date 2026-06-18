@@ -4,6 +4,7 @@ export const en = {
   "create_request": "Create Request",
   "sent": "Sent",
   "tracking": "Tracking",
+  "tracking-document": "Tracking Document",
   "received": "Received",
   "account": "Account",
   "role": "Role",

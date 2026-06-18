@@ -124,7 +124,7 @@ export default function LoginPage() {
                         {/* Soft warm green ambient glow */}
                         <div className="absolute w-36 h-36 md:w-44 md:h-44 bg-green-500/5 rounded-full blur-2xl pointer-events-none" />
                         <img
-                            src="/rupp-logo.png"
+                            src="/rupp-logo-transparent.png"
                             alt="Royal University of Phnom Penh Logo"
                             className="relative w-40 h-40 md:w-48 md:h-48 object-contain"
                         />

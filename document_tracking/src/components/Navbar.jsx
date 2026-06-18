@@ -114,7 +114,7 @@ export default function Navbar({
     };
   }, [currentUser]);
   return (
-    <header className="bg-white dark:bg-[#161616] border-b border-gray-200 dark:border-[#1c1c1e] px-7 py-4.5 flex items-center justify-between sticky top-0 z-10 select-none">
+    <header className="bg-white dark:bg-[#0B0D12] border-b border-gray-200 dark:border-[#2A2F3A] px-7 py-4.5 flex items-center justify-between sticky top-0 z-10 select-none">
       <div className="flex items-center gap-3">
         {/* Hamburger Menu Toggle Button */}
         <button
@@ -128,7 +128,7 @@ export default function Navbar({
           <div className="h-5 w-[1.5px] bg-gray-200 dark:bg-[#2c2c2e] hidden sm:block"></div>
         )}
         {currentUser && (
-          <span className="hidden sm:block text-[14px] font-extrabold text-slate-800 tracking-wide uppercase ml-1">
+          <span className="hidden sm:block text-[14px] font-extrabold text-slate-800 dark:text-gray-200 tracking-wide uppercase ml-1">
             {currentUser.department || currentUser.mainRole || "N/A"}
           </span>
         )}
@@ -164,10 +164,7 @@ export default function Navbar({
         )}
         {currentUser && (
           <div className="hidden sm:flex flex-col text-right select-none">
-            <span className="text-[15px] text-gray-500 font-extrabold mb-0.5 self-end">
-              {currentUser.department || currentUser.mainRole || "N/A"}
-            </span>
-            <span className="text-[12px] font-bold text-gray-800 leading-normal">{getEnglishName(currentUser.username)}</span>
+            <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200 leading-normal">{getEnglishName(currentUser.username)}</span>
             <span className="text-[9px] text-[#1a5b28] font-extrabold tracking-wider uppercase bg-green-100 px-2 py-0.5 rounded border border-green-200 mt-0.5 self-end">
               {currentUser.role || "N/A"}
             </span>
@@ -199,42 +196,42 @@ export default function Navbar({
           </button>
           {/* Profile Dropdown */}
           {isProfileOpen && currentUser && (
-            <div className="absolute right-0 mt-3 w-[340px] bg-white dark:bg-[#1c1c1e] rounded-2xl shadow-xl border border-gray-100 dark:border-[#2c2c2e] p-5 select-none z-50 transform transition-all">
+            <div className="absolute right-0 mt-3 w-[340px] bg-white dark:bg-[#161B22] rounded-2xl shadow-xl border border-gray-100 dark:border-[#2A2F3A] p-5 select-none z-50 transform transition-all">
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-[50px] h-[50px] rounded-full overflow-hidden border-[1.5px] border-gray-300 dark:border-[#3f3f46] shadow-sm flex-shrink-0">
+                  <div className="w-[50px] h-[50px] rounded-full overflow-hidden border-[1.5px] border-gray-300 dark:border-[#2A2F3A] shadow-sm flex-shrink-0">
                     {profilePhoto ? (
                       <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-gray-100 dark:bg-[#2c2c2e] flex items-center justify-center text-gray-400 dark:text-[#a1a1aa]">
+                      <div className="w-full h-full bg-gray-100 dark:bg-[#0B0D12] flex items-center justify-center text-gray-400 dark:text-[#a1a1aa]">
                         <User size={26} />
                       </div>
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <div className="text-[11px] font-semibold text-gray-500 uppercase mb-0.5 truncate">
+                    <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-0.5 truncate">
                       {currentUser.department || currentUser.mainRole || "N/A"}
                     </div>
-                    <div className="text-[15px] font-bold text-gray-900 tracking-wide uppercase truncate">
+                    <div className="text-[15px] font-bold text-gray-900 dark:text-gray-200 tracking-wide uppercase truncate">
                       {getEnglishName(currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username)}
                     </div>
-                    <div className="text-[10px] font-bold text-[#1a5b28] uppercase mt-0.5 truncate">
+                    <div className="text-[10px] font-bold text-[#1a5b28] dark:text-[#34d399] uppercase mt-0.5 truncate">
                       {currentUser.role || "N/A"}
                     </div>
                   </div>
                 </div>
-                <div className="bg-[#9ae59e] text-[#1a5b28] text-[11px] font-medium px-2 py-0.5 rounded-sm tracking-wide">
+                <div className="bg-[#9ae59e] dark:bg-[#0c3f0d] text-[#1a5b28] dark:text-[#34d399] text-[11px] font-medium px-2 py-0.5 rounded-sm tracking-wide">
                   Active
                 </div>
               </div>
-              <div className="w-full h-px bg-gray-100 mb-4" />
+              <div className="w-full h-px bg-gray-100 dark:bg-[#2A2F3A] mb-4" />
               {/* Theme Switcher */}
-              <div className="bg-gray-50 dark:bg-[#1f1f1f] p-1.5 rounded-2xl flex gap-1 mb-4 border border-gray-100/80 dark:border-[#2c2c2e] shadow-inner">
+              <div className="bg-gray-50 dark:bg-[#0B0D12] p-1.5 rounded-2xl flex gap-1 mb-4 border border-gray-100/80 dark:border-[#2A2F3A] shadow-inner">
                 <button
                   onClick={() => setTheme('light')}
                   className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-xl transition-all duration-300 ${
-                    theme === 'light' ? 'bg-white dark:bg-black text-[#1a5b28] dark:text-[#38a152] shadow-sm ring-1 ring-gray-200 dark:ring-gray-700' : 'text-gray-500 dark:text-[#a1a1aa] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-[#2a2a2a]'
+                    theme === 'light' ? 'bg-white dark:bg-[#161B22] text-[#1a5b28] dark:text-[#34d399] shadow-sm ring-1 ring-gray-200 dark:ring-[#2A2F3A]' : 'text-gray-500 dark:text-[#a1a1aa] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-[#242B36]'
                   }`}
                 >
                   <Sun size={18} strokeWidth={2.5} />
@@ -243,7 +240,7 @@ export default function Navbar({
                 <button
                   onClick={() => setTheme('dark')}
                   className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-xl transition-all duration-300 ${
-                    theme === 'dark' ? 'bg-white dark:bg-black text-[#1a5b28] dark:text-[#38a152] shadow-sm ring-1 ring-gray-200 dark:ring-gray-700' : 'text-gray-500 dark:text-[#a1a1aa] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-[#2a2a2a]'
+                    theme === 'dark' ? 'bg-white dark:bg-[#161B22] text-[#1a5b28] dark:text-[#34d399] shadow-sm ring-1 ring-gray-200 dark:ring-[#2A2F3A]' : 'text-gray-500 dark:text-[#a1a1aa] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-[#242B36]'
                   }`}
                 >
                   <Moon size={18} strokeWidth={2.5} />
@@ -252,18 +249,18 @@ export default function Navbar({
                 <button
                   onClick={() => setTheme('system')}
                   className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-xl transition-all duration-300 ${
-                    theme === 'system' ? 'bg-white dark:bg-black text-[#1a5b28] dark:text-[#38a152] shadow-sm ring-1 ring-gray-200 dark:ring-gray-700' : 'text-gray-500 dark:text-[#a1a1aa] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-[#2a2a2a]'
+                    theme === 'system' ? 'bg-white dark:bg-[#161B22] text-[#1a5b28] dark:text-[#34d399] shadow-sm ring-1 ring-gray-200 dark:ring-[#2A2F3A]' : 'text-gray-500 dark:text-[#a1a1aa] hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-[#242B36]'
                   }`}
                 >
                   <Monitor size={18} strokeWidth={2.5} />
                   <span className="text-[10px] font-bold tracking-wide">System</span>
                 </button>
               </div>
-              <div className="w-full h-px bg-gray-100 mb-4" />
+              <div className="w-full h-px bg-gray-100 dark:bg-[#2A2F3A] mb-4" />
               {/* Sign out */}
               <button
                 onClick={handleLogout}
-                className="flex items-center justify-center gap-2.5 w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors mt-1"
+                className="flex items-center justify-center gap-2.5 w-full py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl transition-colors mt-1"
               >
                 <LogOut size={16} strokeWidth={2.5} className="transform rotate-180" />
                 <span className="text-[12px] font-bold tracking-wider uppercase">Sign Out</span>
@@ -272,15 +269,15 @@ export default function Navbar({
           )}
         </div>
         {/* Vertical divider */}
-        <div className="w-[1.5px] h-4 bg-gray-200" />
+        <div className="w-[1.5px] h-4 bg-gray-200 dark:bg-[#2A2F3A]" />
         {/* Premium Language Switcher (Square-ish Design) */}
         <div
           onClick={toggleLanguage}
-          className="relative flex items-center bg-gray-100 border border-gray-200 p-[3px] rounded-lg cursor-pointer w-[84px] h-[34px] shadow-inner select-none"
+          className="relative flex items-center bg-gray-100 dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] p-[3px] rounded-lg cursor-pointer w-[84px] h-[34px] shadow-inner select-none"
         >
           {/* Animated Slider Background */}
           <div
-            className={`absolute top-[3px] bottom-[3px] w-[calc(50%-3px)] bg-white rounded-md shadow transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+            className={`absolute top-[3px] bottom-[3px] w-[calc(50%-3px)] bg-white dark:bg-[#0B0D12] rounded-md shadow transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
               language === 'km' ? 'translate-x-[39px]' : 'translate-x-0'
             }`}
           />

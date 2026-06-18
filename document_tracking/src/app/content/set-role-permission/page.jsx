@@ -73,7 +73,7 @@ export default function SetRolePermissionPage() {
         }
       }
     } catch (e) { console.error(e); }
-    const isGlobal = user?.email === "itcsuperadmin@rupp.edu.kh";
+    const isGlobal = user?.email === "admin@rupp.edu.kh";
     const adminCheckStr1 = (user?.type || user?.role || "").toLowerCase();
     const isDeptAdmin = adminCheckStr1.includes("super admin") || adminCheckStr1 === "admin";
     if (!isGlobal && isDeptAdmin) {
