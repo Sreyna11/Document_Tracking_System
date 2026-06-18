@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "../../context/LanguageContext";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { MapPin, Search, Check, Clock, AlertTriangle, FileText, Package, Navigation, Map as MapIcon, Play } from "lucide-react";
@@ -86,20 +87,7 @@ export default function TrackingPage() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [now, setNow] = useState(new Date());
-  const t = (k) => {
-    const map = {
-      'checking_credentials': 'Checking Credentials...',
-      'live_tracking': 'Live Tracking',
-      'search_tracking': 'Search tracking number...',
-      'no_tracking_orders': 'No tracking orders found.',
-      'tracking_id': 'Tracking ID:',
-      'delivery_status': 'Delivery Status',
-      'no_path': 'No routing path available.',
-      'select_request': 'Select a tracking request',
-      'select_instruction': 'Select an item from the left panel to view detailed tracking information.'
-    };
-    return map[k] || k;
-  };
+  const { t } = useLanguage();
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
@@ -335,17 +323,17 @@ export default function TrackingPage() {
                                      isImprove ? "bg-purple-50 border-purple-200 text-purple-700" :
                                      "bg-yellow-50 border-yellow-200 text-yellow-700"
                                   }`}>
-                                     {isCompleted ? `Completed` : 
-                                      isFailed ? `Rejected` :
-                                      isImprove ? (isSender ? `Returned from ${req.path && req.path[req.currentStepIndex || 0] ? (typeof req.path[req.currentStepIndex || 0] === 'string' ? req.path[req.currentStepIndex || 0] : req.path[req.currentStepIndex || 0].department || req.path[req.currentStepIndex || 0].mainRole) : "Unknown"}` : `Returned to ${req.senderDepartment || "Sender"}`) :
-                                      `Pending ${req.path && req.path[req.currentStepIndex || 0] ? (typeof req.path[req.currentStepIndex || 0] === 'string' ? req.path[req.currentStepIndex || 0] : req.path[req.currentStepIndex || 0].department || req.path[req.currentStepIndex || 0].mainRole) : "Unknown"}`}
+                                     {isCompleted ? (t("completed_stat") || "Completed") : 
+                                      isFailed ? (t("rejected") || "Rejected") :
+                                      isImprove ? (isSender ? `${t("returned") || "Returned"} ${t("from")?.toLowerCase() || "from"} ${req.path && req.path[req.currentStepIndex || 0] ? (typeof req.path[req.currentStepIndex || 0] === 'string' ? req.path[req.currentStepIndex || 0] : req.path[req.currentStepIndex || 0].department || req.path[req.currentStepIndex || 0].mainRole) : "Unknown"}` : `${t("returned") || "Returned"} ${t("to")?.toLowerCase() || "to"} ${req.senderDepartment || "Sender"}`) :
+                                      `${t("pending") || "Pending"} ${req.path && req.path[req.currentStepIndex || 0] ? (typeof req.path[req.currentStepIndex || 0] === 'string' ? req.path[req.currentStepIndex || 0] : req.path[req.currentStepIndex || 0].department || req.path[req.currentStepIndex || 0].mainRole) : "Unknown"}`}
                                   </div>
                                </div>
                                
                                <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
-                                  <p><span className="font-semibold text-gray-900 dark:text-white">Document Type:</span> {req.type}</p>
-                                  <p><span className="font-semibold text-gray-900 dark:text-white">Title:</span> {req.title || req.subject}</p>
-                                  <p><span className="font-semibold text-gray-900 dark:text-white">Date:</span> {formattedDateString} at {finalTime}</p>
+                                  <p><span className="font-semibold text-gray-900 dark:text-white">{t("type_document") || "Document Type"}:</span> {req.documentType || req.type}</p>
+                                  <p><span className="font-semibold text-gray-900 dark:text-white">{t("title") || "Title"}:</span> {req.title || req.subject}</p>
+                                  <p><span className="font-semibold text-gray-900 dark:text-white">{t("date") || "Date"}:</span> {formattedDateString} at {finalTime}</p>
                                </div>
                             </div>
                           )
@@ -381,10 +369,10 @@ export default function TrackingPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">{t('delivery_status')}</p>
                       <p className={`text-sm font-bold truncate ${selectedRequest.status === "Failed" ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-200"}`}>
-                        {selectedRequest.status === "Completed" ? "Completed" :
-                         selectedRequest.status === "Assigned to Improve" ? (((currentUser?.department || currentUser?.mainRole || "global").toLowerCase().trim() === (selectedRequest.senderDepartment || "").toLowerCase().trim() || (currentUser?.email || "").toLowerCase().trim() === (selectedRequest.senderEmail || "").toLowerCase().trim()) ? `Returned from ${selectedRequest.path && selectedRequest.path[selectedRequest.currentStepIndex || 0] ? (typeof selectedRequest.path[selectedRequest.currentStepIndex || 0] === 'string' ? selectedRequest.path[selectedRequest.currentStepIndex || 0] : selectedRequest.path[selectedRequest.currentStepIndex || 0].department || selectedRequest.path[selectedRequest.currentStepIndex || 0].mainRole) : "Unknown"}` : `Returned to ${selectedRequest.senderDepartment || "Sender"}`) :
-                         selectedRequest.status === "Failed" ? "Rejected" :
-                         `Pending ${selectedRequest.path && selectedRequest.path[selectedRequest.currentStepIndex || 0] ? (typeof selectedRequest.path[selectedRequest.currentStepIndex || 0] === 'string' ? selectedRequest.path[selectedRequest.currentStepIndex || 0] : selectedRequest.path[selectedRequest.currentStepIndex || 0].department || selectedRequest.path[selectedRequest.currentStepIndex || 0].mainRole) : "Unknown"}`}
+                        {selectedRequest.status === "Completed" ? (t("completed_stat") || "Completed") :
+                         selectedRequest.status === "Assigned to Improve" ? (((currentUser?.department || currentUser?.mainRole || "global").toLowerCase().trim() === (selectedRequest.senderDepartment || "").toLowerCase().trim() || (currentUser?.email || "").toLowerCase().trim() === (selectedRequest.senderEmail || "").toLowerCase().trim()) ? `${t("returned") || "Returned"} ${t("from")?.toLowerCase() || "from"} ${selectedRequest.path && selectedRequest.path[selectedRequest.currentStepIndex || 0] ? (typeof selectedRequest.path[selectedRequest.currentStepIndex || 0] === 'string' ? selectedRequest.path[selectedRequest.currentStepIndex || 0] : selectedRequest.path[selectedRequest.currentStepIndex || 0].department || selectedRequest.path[selectedRequest.currentStepIndex || 0].mainRole) : "Unknown"}` : `${t("returned") || "Returned"} ${t("to")?.toLowerCase() || "to"} ${selectedRequest.senderDepartment || "Sender"}`) :
+                         selectedRequest.status === "Failed" ? (t("rejected") || "Rejected") :
+                         `${t("pending") || "Pending"} ${selectedRequest.path && selectedRequest.path[selectedRequest.currentStepIndex || 0] ? (typeof selectedRequest.path[selectedRequest.currentStepIndex || 0] === 'string' ? selectedRequest.path[selectedRequest.currentStepIndex || 0] : selectedRequest.path[selectedRequest.currentStepIndex || 0].department || selectedRequest.path[selectedRequest.currentStepIndex || 0].mainRole) : "Unknown"}`}
                       </p>
                     </div>
                   </div>
@@ -501,10 +489,10 @@ export default function TrackingPage() {
                                 }`}>
                                   <div className="flex flex-col gap-1.5 mb-4 text-left">
                                     <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200">
-                                      {idx === 0 ? "Request by :" : isPast ? "Approved by :" : (dept.assignedTo ? "Assigned to :" : "Pending at :")} <span className="font-semibold text-gray-500 dark:text-gray-400 ml-1">{userName}</span>
+                                      {idx === 0 ? (t("request_by") || "Request by") + " :" : isPast ? (t("approved_by") || "Approved by") + " :" : (dept.assignedTo ? (t("assigned_to") || "Assigned to") + " :" : (t("pending_at") || "Pending at") + " :")} <span className="font-semibold text-gray-500 dark:text-gray-400 ml-1">{userName}</span>
                                     </p>
                                     <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200">
-                                      From : <span className="font-semibold text-gray-500 dark:text-gray-400 ml-1">{typeof dept === 'string' ? dept : (dept.department || dept.mainRole || "Unknown")}</span>
+                                      {(t("from") || "From")} : <span className="font-semibold text-gray-500 dark:text-gray-400 ml-1">{typeof dept === 'string' ? dept : (dept.department || dept.mainRole || "Unknown")}</span>
                                     </p>
                                   </div>
                                   
@@ -522,7 +510,7 @@ export default function TrackingPage() {
                                     </div>
                                     {isPast ? (
                                       <span className="text-[9px] font-bold text-green-700 border border-green-700 px-1.5 py-0.5 rounded uppercase flex items-center gap-1">
-                                        <Check size={10} /> {idx === 0 ? "Sent" : "Approved"}
+                                        <Check size={10} /> {idx === 0 ? (t("sent") || "Sent") : (t("approved") || "Approved")}
                                       </span>
                                     ) : isActive ? (
                                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase flex items-center gap-1 ${
@@ -530,11 +518,11 @@ export default function TrackingPage() {
                                         isFailed ? "text-red-700 border-red-700" :
                                         isImprovement ? "text-purple-700 border-purple-700" : "text-yellow-700 border-yellow-700"
                                       }`}>
-                                        {isCompleted ? <><Check size={10} /> {idx === 0 ? "Sent" : "Approved"}</> : isFailed ? "Rejected" : isImprovement ? "Returned" : "Pending"}
+                                        {isCompleted ? <><Check size={10} /> {idx === 0 ? (t("sent") || "Sent") : (t("approved") || "Approved")}</> : isFailed ? (t("rejected") || "Rejected") : isImprovement ? (t("returned") || "Returned") : (t("pending") || "Pending")}
                                       </span>
                                     ) : (
                                       <span className="text-[9px] font-bold text-gray-400 border border-gray-300 px-1.5 py-0.5 rounded uppercase">
-                                        Pending
+                                        {t("pending") || "Pending"}
                                       </span>
                                     )}
                                   </div>

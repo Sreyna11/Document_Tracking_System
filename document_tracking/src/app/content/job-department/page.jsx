@@ -30,7 +30,7 @@ export default function JobDepartmentPage() {
   const [actionMenuOpen, setActionMenuOpen] = useState(null);
 
   // Modals
-  const [deleteModalConfig, setDeleteModalConfig] = useState({ isOpen: false, id: null, isBulk: false });
+  const [deleteModalConfig, setDeleteModalConfig] = useState({ isOpen: false, id: null, isBulk: false, title: "" });
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "" });
   const showAlert = (message) => setAlertModal({ isOpen: true, message });
 
@@ -122,8 +122,8 @@ export default function JobDepartmentPage() {
     setViewState("CREATE");
   };
 
-  const handleDeleteClick = (id) => {
-    setDeleteModalConfig({ isOpen: true, id, isBulk: false });
+  const handleDeleteClick = (dept) => {
+    setDeleteModalConfig({ isOpen: true, id: dept.id, title: dept.title, isBulk: false });
   };
 
   const confirmDelete = () => {
@@ -138,7 +138,7 @@ export default function JobDepartmentPage() {
       localStorage.setItem("doc_tracking_departments", JSON.stringify(updatedList));
       setSelectedRows(prev => prev.filter(rowId => rowId !== deleteModalConfig.id));
     }
-    setDeleteModalConfig({ isOpen: false, id: null, isBulk: false });
+    setDeleteModalConfig({ isOpen: false, id: null, isBulk: false, title: "" });
   };
 
   // Role Management Functions
@@ -257,7 +257,7 @@ export default function JobDepartmentPage() {
 
   const handleDeleteSelected = () => {
     if (selectedRows.length > 0) {
-      setDeleteModalConfig({ isOpen: true, id: null, isBulk: true });
+      setDeleteModalConfig({ isOpen: true, id: null, isBulk: true, title: "" });
     }
   };
 
@@ -392,7 +392,7 @@ export default function JobDepartmentPage() {
                                         )}
                                         {hasPermission(currentUser, "Job Department", "Delete") && (
                                           <button
-                                            onClick={() => { setActionMenuOpen(null); handleDeleteClick(dept.id); }}
+                                            onClick={() => { setActionMenuOpen(null); handleDeleteClick(dept); }}
                                             className="w-full text-left px-4 py-2 text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                                           >
                                             <Trash2 size={14} /> {t("delete")}
@@ -946,11 +946,11 @@ export default function JobDepartmentPage() {
 
       <DeleteConfirmationModal
         isOpen={deleteModalConfig.isOpen}
-        onClose={() => setDeleteModalConfig({ isOpen: false, id: null, isBulk: false })}
+        onClose={() => setDeleteModalConfig({ isOpen: false, id: null, isBulk: false, title: "" })}
         onConfirm={confirmDelete}
         itemCount={deleteModalConfig.isBulk ? selectedRows.length : 1}
-        itemName={""}
-        itemType="department(s)"
+        itemName={deleteModalConfig.title || ""}
+        itemType="departments"
       />
 
       <AlertModal

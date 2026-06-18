@@ -408,7 +408,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-500 dark:text-orange-400">
                                     <Bell size={16} />
                                 </div>
-                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("actions_required") || "Action Required"}</h3>
+                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("actions_required") || "Action Required"}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.actionRequired}</div>
                             <div className="text-xs font-semibold text-orange-500 dark:text-orange-400 mt-1 flex items-center gap-1">{t("requires_attention")} <ChevronRight size={12} /></div>
@@ -419,7 +419,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
                                     <FileText size={16} />
                                 </div>
-                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("total")} {t("sent")}</h3>
+                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("total")} {t("sent")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.totalSent}</div>
                             <div className="text-xs font-semibold text-purple-500 dark:text-purple-400 mt-1 flex items-center gap-1">{t("documents_initiated")} <ChevronRight size={12} /></div>
@@ -430,7 +430,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500 dark:text-emerald-400">
                                     <CheckCircle size={16} />
                                 </div>
-                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("completed_stat") || t("completed")}</h3>
+                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("completed_stat") || t("completed")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.completed}</div>
                             <div className="text-xs font-semibold text-emerald-500 dark:text-emerald-400 mt-1 flex items-center gap-1">{t("successfully_finished")} <ChevronRight size={12} /></div>
@@ -441,7 +441,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400">
                                     <XCircle size={16} />
                                 </div>
-                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("returned_failed")}</h3>
+                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("returned_failed")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.returned}</div>
                             <div className="text-xs font-semibold text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1">{t("needs_corrections")} <ChevronRight size={12} /></div>
@@ -452,7 +452,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 dark:text-blue-400">
                                     <Clock size={16} />
                                 </div>
-                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("in_progress_stat") || t("in_progress")}</h3>
+                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("in_progress_stat") || t("in_progress")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.inProgress}</div>
                             <div className="text-xs font-semibold text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">{t("currently_in_process")} <ChevronRight size={12} /></div>
@@ -548,11 +548,11 @@ export default function DashboardPage() {
                                 <div className="flex-1 overflow-x-auto">
                                     <table className="w-full text-left text-sm whitespace-nowrap">
                                         <thead>
-                                            <tr className="text-xs font-semibold text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#2A2F3A]">
-                                                <th className="pb-3 font-medium">{t("type_document")}</th>
-                                                <th className="pb-3 font-medium">{t("title") || "Title"}</th>
-                                                <th className="pb-3 font-medium text-center">{t("total_times")}</th>
-                                                <th className="pb-3 font-medium text-center">{t("action")}</th>
+                                            <tr className="text-[14px] font-semibold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#2A2F3A]">
+                                                <th className="pb-3 font-bold">{t("type_document")}</th>
+                                                <th className="pb-3 font-bold">{t("title") || "Title"}</th>
+                                                <th className="pb-3 font-bold text-center">{t("total_times")}</th>
+                                                <th className="pb-3 font-bold text-center">{t("action")}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="text-slate-700 dark:text-slate-300">
@@ -739,7 +739,7 @@ export default function DashboardPage() {
                                                 <div className="mt-auto flex items-center justify-between p-4 bg-white dark:bg-[#161B22] rounded-xl border border-slate-100 dark:border-[#2A2F3A]">
                                                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm">
                                                         <Clock size={16} />
-                                                        Total Time Elapsed
+                                                        {t("total_time_elapsed") || "Total Time Elapsed"}
                                                     </div>
                                                     <div className="px-3 py-1 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold text-sm">
                                                         {selectedLongestReq.totalTimeFormatted}
@@ -749,15 +749,15 @@ export default function DashboardPage() {
                                             {/* Right Panel: Step Taking Longest Time */}
                                             <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
-                                                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">Step Taking Longest Time</h3>
+                                                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">{t("step_taking_longest_time") || "Step Taking Longest Time"}</h3>
 
                                                 <div className="overflow-hidden border border-slate-100 dark:border-[#2A2F3A] rounded-xl mb-6">
                                                     <table className="w-full text-left text-sm whitespace-nowrap">
                                                         <thead className="bg-white dark:bg-[#161B22]">
                                                             <tr className="text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider">
-                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">Step</th>
-                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">Department</th>
-                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A] text-right">Time Spent</th>
+                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">{t("step") || "Step"}</th>
+                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">{t("department") || "Department"}</th>
+                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A] text-right">{t("time_spent") || "Time Spent"}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100 dark:divide-[#2A2F3A] font-medium text-slate-700 dark:text-slate-300">
@@ -785,7 +785,7 @@ export default function DashboardPage() {
                                                 <div className="mt-auto flex items-start gap-3 p-4 bg-white dark:bg-[#161B22] text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
                                                     <Info size={18} className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
                                                     <span className="text-sm font-medium leading-relaxed">
-                                                        The <strong className="font-bold">{selectedLongestReq.longestStepName}</strong> step is taking the longest.
+                                                        {t("step_prefix") || "The"} <strong className="font-bold">{selectedLongestReq.longestStepName}</strong> {t("step_is_taking_longest") || "step is taking the longest."}
                                                     </span>
                                                 </div>
                                             </div>

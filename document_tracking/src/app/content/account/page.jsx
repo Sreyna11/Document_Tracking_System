@@ -70,6 +70,7 @@ export default function AccountPage() {
     isOpen: false,
     isBulk: false,
     userId: null,
+    title: "",
   });
   useEffect(() => {
     const userStr = sessionStorage.getItem("currentUser");
@@ -363,11 +364,12 @@ export default function AccountPage() {
       }, 1000);
     }
   };
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = (user) => {
     setDeleteModalConfig({
       isOpen: true,
       isBulk: false,
-      userId: userId
+      userId: user.id,
+      title: `${user.firstName} ${user.lastName}`
     });
   };
   const confirmDelete = () => {
@@ -382,7 +384,7 @@ export default function AccountPage() {
       localStorage.setItem("doc_tracking_users", JSON.stringify(updatedUsers));
       setSelectedRows(prev => prev.filter(rowId => rowId !== deleteModalConfig.userId));
     }
-    setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null });
+    setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null, title: "" });
   };
   const handleSelectAll = () => {
     setSelectedRows(paginatedUsers.map(u => u.id));
@@ -395,7 +397,8 @@ export default function AccountPage() {
       setDeleteModalConfig({
         isOpen: true,
         isBulk: true,
-        userId: null
+        userId: null,
+        title: ""
       });
     }
   };
@@ -484,8 +487,8 @@ export default function AccountPage() {
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-[14px]">
-                        <thead className="bg-gray-50 dark:bg-[#242B36] text-gray-700 dark:text-white font-semibold">
+                      <table className="w-full text-left text-[15px]">
+                        <thead className="text-[15px] bg-gray-50 dark:bg-[#242B36] text-gray-700 dark:text-white font-semibold">
                           <tr className="border-b border-gray-200 dark:border-[#2A2F3A]">
                             <th className="py-3 px-4 w-12 text-center cursor-pointer" onClick={() => selectedRows.length === paginatedUsers.length && paginatedUsers.length > 0 ? handleDeselectAll() : handleSelectAll()}>
                               <div className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors mx-auto ${selectedRows.length === paginatedUsers.length && paginatedUsers.length > 0 ? 'bg-[#1a5b28] border-[#1a5b28]' : 'bg-white dark:bg-[#161B22] border-gray-400'}`}>
@@ -521,8 +524,8 @@ export default function AccountPage() {
                                   )}
                                 </td>
                                 <td className="py-3 px-4">
-                                  <div className="font-semibold text-black dark:text-white">{user.firstName}</div>
-                                  <div className="text-[12px] text-gray-500 dark:text-[#a1a1aa]">{user.lastName}</div>
+                                  <div className="font-semibold text-[16px] text-black dark:text-white">{user.firstName}</div>
+                                  <div className="text-[14px] text-gray-500 dark:text-[#a1a1aa]">{user.lastName}</div>
                                 </td>
                                 <td className="py-3 px-4">
                                   {user.email}
@@ -541,7 +544,7 @@ export default function AccountPage() {
                                       (user.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
                                       'bg-gray-100 text-gray-700'
                                     }`}>{user.type}</span>
-                                  ) : <span className="text-gray-400 italic text-[11px]">N/A</span>}
+                                  ) : <span className="text-gray-400 italic text-[14px]">N/A</span>}
                                 </td>
                                 <td className="py-3 px-4 relative">
                                   <div className="flex justify-end relative">
@@ -569,15 +572,15 @@ export default function AccountPage() {
                                               onClick={() => { setActionMenuOpen(null); handleEditClick(user); }}
                                               className="w-full text-left px-4 py-2 text-[13px] text-[#dcb23c] hover:bg-[#fff9e6] flex items-center gap-2 transition-colors"
                                             >
-                                              <Edit size={14} /> {t("edit_user")}
+                                              <Edit size={14} /> {t("edit")}
                                             </button>
                                           )}
                                           {hasPermission(currentUser, "Account", "Delete") && (
                                             <button
-                                              onClick={() => { setActionMenuOpen(null); handleDeleteUser(user.id); }}
+                                              onClick={() => { setActionMenuOpen(null); handleDeleteUser(user); }}
                                               className="w-full text-left px-4 py-2 text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                                             >
-                                              <Trash2 size={14} /> {t("delete_confirmation")}
+                                              <Trash2 size={14} /> {t("delete")}
                                             </button>
                                           )}
                                         </div>
@@ -631,9 +634,9 @@ export default function AccountPage() {
                           setViewState('LIST'); 
                           resetForm(); 
                         }}
-                        className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
+                        className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
                       >
-                        Back
+                        {t("back")}
                       </button>
                     </div>
                   </div>
@@ -677,33 +680,33 @@ export default function AccountPage() {
                         <h3 className="font-bold text-black dark:text-white mb-6 text-lg">{t("user_information")}</h3>
                         <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                           <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("first_name")} <span className="text-red-500">*</span>
+                            <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
+                              {t("fullname_km")} <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               required
                               value={firstName}
                               onChange={(e) => setFirstName(e.target.value)}
-                              placeholder="ឈ្មោះពេញ"
+                              placeholder={t("fullname_km_placeholder")}
                               className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
                             />
                           </div>
                           <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("last_name")} <span className="text-red-500">*</span>
+                            <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
+                              {t("fullname_en")} <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               required
                               value={lastName}
                               onChange={(e) => setLastName(e.target.value)}
-                              placeholder="Fullname"
+                              placeholder={t("fullname_en_placeholder")}
                               className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
                             />
                           </div>
                           <div className="col-span-2">
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                            <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
                               {t("phone")} <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -716,7 +719,7 @@ export default function AccountPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                            <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
                               {t("email_contact")} <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -729,7 +732,7 @@ export default function AccountPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                            <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
                               {t("password")} <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -742,7 +745,7 @@ export default function AccountPage() {
                             />
                           </div>
                           <div className="col-span-2 pt-2">
-                            <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
+                            <label className="block text-[15px] font-bold text-black dark:text-white mb-2">
                               Status
                             </label>
                             <div className="flex gap-6">
@@ -769,10 +772,10 @@ export default function AccountPage() {
                             </div>
                           </div>
                           <div className="col-span-2 pt-4 mt-2 border-t border-gray-100 dark:border-[#2A2F3A]">
-                            <h3 className="font-bold text-black dark:text-white text-[15px] mb-4">Department & Role</h3>
+                            <h3 className="font-bold text-black dark:text-white text-[16px] mb-4">Department & Role</h3>
                             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                               <div>
-                                <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
                                   Department <span className="text-red-500">*</span>
                                 </label>
                                 {mainRoles.length === 0 ? (
@@ -799,7 +802,7 @@ export default function AccountPage() {
                                 )}
                               </div>
                               <div>
-                                <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
                                   Title <span className="text-red-500">*</span>
                                 </label>
                                 <select
@@ -819,7 +822,7 @@ export default function AccountPage() {
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                <label className="block text-[15px] font-bold text-black dark:text-white mb-1">
                                   Role <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -873,15 +876,15 @@ export default function AccountPage() {
                           onClick={() => handleEditClick(selectedUserView)}
                           className="px-6 py-2 bg-[#dcb23c] hover:bg-[#c29c30] text-white text-[14px] font-medium rounded-md transition-colors"
                         >
-                          Edit
+                          {t("edit")}
                         </button>
                       )}
                       {(isGlobalSuperAdmin || isDepartmentAdmin) && (
                         <button
                           onClick={() => setViewState('LIST')}
-                          className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] text-white text-[14px] font-medium rounded-md transition-colors"
+                          className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:hover:bg-[#242B36] text-white text-[14px] font-medium rounded-md transition-colors"
                         >
-                          Back
+                          {t("back")}
                         </button>
                       )}
                     </div>
@@ -988,16 +991,10 @@ export default function AccountPage() {
       {/* DELETE CONFIRMATION MODAL */}
       <DeleteConfirmationModal
         isOpen={deleteModalConfig.isOpen}
-        onClose={() => setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null })}
+        onClose={() => setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null, title: "" })}
         onConfirm={confirmDelete}
         itemCount={deleteModalConfig.isBulk ? selectedRows.length : 1}
-        itemName={
-          !deleteModalConfig.isBulk && deleteModalConfig.userId
-            ? (language === 'en'
-              ? usersList.find(u => u.id === deleteModalConfig.userId)?.lastName
-              : usersList.find(u => u.id === deleteModalConfig.userId)?.firstName)
-            : ""
-        }
+        itemName={deleteModalConfig.title || ""}
         itemType="users"
       />
       {/* Custom Alert Modal */}
