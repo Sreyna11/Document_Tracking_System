@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { hasPermission } from "../../../utils/permissions";
@@ -8,9 +8,11 @@ import DeleteConfirmationModal from "../../../components/DeleteConfirmationModal
 import AlertModal from "../../../components/AlertModal";
 import { Search, Edit, Trash2 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
+import SearchableSelect from "../../../components/SearchableSelect";
 export default function DocumentTypePage() {
   const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const { t } = useLanguage();
@@ -18,7 +20,7 @@ export default function DocumentTypePage() {
   const [viewState, setViewState] = useState("LIST");
   const [documentTypes, setDocumentTypes] = useState([]);
   const [selectedDocType, setSelectedDocType] = useState(null);
-  
+
   // Delete Modal State
   const [deleteModalConfig, setDeleteModalConfig] = useState({ isOpen: false, id: null, title: "" });
   // Alert Modal State
@@ -46,7 +48,7 @@ export default function DocumentTypePage() {
     }
     const user = JSON.parse(userStr);
     setCurrentUser(user);
-    
+
     // Load stored document types if any, else empty array
     // Explicitly requested: NO initial mock data.
     const stored = localStorage.getItem("doc_tracking_document_types_v2");
@@ -81,7 +83,7 @@ export default function DocumentTypePage() {
         if (Array.isArray(parsedDepts) && parsedDepts.length > 0) {
           const deptNames = [...new Set(parsedDepts.map(d => d.title).filter(Boolean))];
           if (deptNames.length > 0) setAvailableDepartments(deptNames);
-          
+
           const users = [...new Set(parsedDepts.map(d => d.userSignature).filter(Boolean))];
           if (users.length > 0) setAvailableUsers(users);
           const mapping = {};
@@ -96,14 +98,14 @@ export default function DocumentTypePage() {
         console.error("Error loading departments for dropdowns", e);
       }
     }
-    
+
     setIsMounted(true);
-  }, [router]);
+  }, []);
   if (!isMounted) return null;
   // Handlers for Form
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Auto slug logic if title changes and slug hasn't been manually heavily edited
     if (name === "title") {
       const autoSlug = value.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '');
@@ -115,16 +117,20 @@ export default function DocumentTypePage() {
   const handleStepChange = (index, field, value) => {
     const newSteps = [...steps];
     newSteps[index][field] = value;
-    
+
     // Auto-fill userSign when department changes
     if (field === "department" && departmentUsersMap[value]) {
       newSteps[index]["userSign"] = departmentUsersMap[value];
     }
-    
+
     setSteps(newSteps);
   };
   const addStep = () => {
     setSteps([...steps, { department: "", userSign: "" }]);
+  };
+  const removeStep = (index) => {
+    const newSteps = steps.filter((_, idx) => idx !== index);
+    setSteps(newSteps);
   };
   const handleEditDocType = (e, doc) => {
     e.stopPropagation();
@@ -182,9 +188,9 @@ export default function DocumentTypePage() {
     } else {
       updatedList = [...documentTypes, newDocType];
     }
-    
+
     setDocumentTypes(updatedList);
-    
+
     const stored = localStorage.getItem("doc_tracking_document_types_v2");
     let allDocs = stored ? JSON.parse(stored) : [];
     if (viewState === "EDIT" && selectedDocType) {
@@ -193,7 +199,7 @@ export default function DocumentTypePage() {
       allDocs.push(newDocType);
     }
     localStorage.setItem("doc_tracking_document_types_v2", JSON.stringify(allDocs));
-    
+
     // Reset form and return to list
     setFormData({ code: "", title: "", slug: "", status: "Active" });
     setSteps([{ department: "", userSign: "" }]);
@@ -208,13 +214,13 @@ export default function DocumentTypePage() {
   return (
     <div className="flex bg-[#fdfdfd] dark:bg-[#0F1117] min-h-screen font-sans">
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-      
+
       <div className={`flex-1 transition-all duration-300 ease-in-out flex flex-col min-w-0 dark:bg-[#0F1117]`}>
         <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} currentUser={currentUser} />
-        
+
         <main className="p-8 flex-1 overflow-x-hidden flex flex-col">
           <div className="w-full flex flex-col flex-1">
-            
+
             {viewState === "LIST" && (
               <div className="flex flex-col h-full animate-fade-in">
                 <div className="flex justify-between items-center mb-8">
@@ -256,14 +262,13 @@ export default function DocumentTypePage() {
                                 <div
                                   key={doc.id}
                                   onClick={() => setSelectedDocType(doc)}
-                                  className={`relative border-[2px] rounded-sm p-5 cursor-pointer transition-colors ${
-                                    isSelected ? "border-[#1a5b28] dark:border-[#2da94a] bg-green-50 dark:bg-[#1a5b28]/20 shadow-sm" : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2A2F3A] hover:border-gray-300 dark:hover:border-gray-600 shadow-sm"
-                                  }`}
+                                  className={`relative border-[2px] rounded-sm p-5 cursor-pointer transition-colors ${isSelected ? "border-[#1a5b28] dark:border-[#2da94a] bg-green-50 dark:bg-[#1a5b28]/20 shadow-sm" : "bg-white dark:bg-[#161B22] border-gray-200 dark:border-[#2A2F3A] hover:border-gray-300 dark:hover:border-gray-600 shadow-sm"
+                                    }`}
                                 >
                                   <div className="absolute bottom-4 right-4 flex gap-1">
                                     {hasPermission(currentUser, "Type Document", "Edit") && (
-                                      <button 
-                                        onClick={(e) => handleEditDocType(e, doc)} 
+                                      <button
+                                        onClick={(e) => handleEditDocType(e, doc)}
                                         className="p-1.5 text-gray-400 hover:text-[#dcb23c] dark:hover:text-[#dcb23c] transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-[#242B36]"
                                         title={t("edit")}
                                       >
@@ -271,8 +276,8 @@ export default function DocumentTypePage() {
                                       </button>
                                     )}
                                     {hasPermission(currentUser, "Type Document", "Delete") && (
-                                      <button 
-                                        onClick={(e) => handleDeleteDocType(e, doc)} 
+                                      <button
+                                        onClick={(e) => handleDeleteDocType(e, doc)}
                                         className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-md hover:bg-red-50 dark:hover:bg-red-500/10"
                                         title={t("delete")}
                                       >
@@ -306,7 +311,7 @@ export default function DocumentTypePage() {
                       <div className="p-4 border-b border-gray-200 dark:border-[#2A2F3A]">
                         <h2 className="text-[16px] font-bold text-black dark:text-white">{t("flow_tracking")}</h2>
                       </div>
-                      
+
                       <div className="p-8 flex-1 bg-white dark:bg-[#161B22]">
                         {!selectedDocType ? (
                           <div className="text-center text-gray-400 dark:text-[#a1a1aa] py-12 italic text-[14px]">
@@ -323,7 +328,7 @@ export default function DocumentTypePage() {
                                   {!isFinal && (
                                     <div className="absolute left-[-1px] top-[35px] w-[2px] h-[calc(100%+2rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
                                   )}
-                                  
+
                                   {/* Step Info Box */}
                                   <div className="bg-gray-100/50 dark:bg-[#242B36] border border-[#1a5b28] dark:border-[#2da94a] rounded-xl px-4 py-3 flex justify-between items-center relative w-full">
                                     <div className="flex flex-col gap-1.5">
@@ -413,13 +418,13 @@ export default function DocumentTypePage() {
                           <div className={`w-[18px] h-[18px] rounded-full border-[2px] flex items-center justify-center ${formData.status === "Active" ? "border-[#1a5b28] dark:border-[#2da94a]" : "border-gray-300 dark:border-[#2A2F3A]"}`}>
                             {formData.status === "Active" && <div className="w-2.5 h-2.5 rounded-full bg-[#1a5b28] dark:bg-[#2da94a]"></div>}
                           </div>
-                          <input 
-                            type="radio" 
-                            name="status" 
+                          <input
+                            type="radio"
+                            name="status"
                             value="Active"
                             checked={formData.status === "Active"}
-                            onChange={(e) => setFormData({...formData, status: e.target.value})}
-                            className="hidden" 
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                            className="hidden"
                           />
                           <span className="text-[15px] text-[#1a5b28] dark:text-[#2da94a] font-medium">{t("active")}</span>
                         </label>
@@ -427,13 +432,13 @@ export default function DocumentTypePage() {
                           <div className={`w-[18px] h-[18px] rounded-full border-[2px] flex items-center justify-center ${formData.status === "Inactive" ? "border-[#1a5b28] dark:border-[#2da94a]" : "border-gray-300 dark:border-[#2A2F3A]"}`}>
                             {formData.status === "Inactive" && <div className="w-2.5 h-2.5 rounded-full bg-[#1a5b28] dark:bg-[#2da94a]"></div>}
                           </div>
-                          <input 
-                            type="radio" 
-                            name="status" 
+                          <input
+                            type="radio"
+                            name="status"
                             value="Inactive"
                             checked={formData.status === "Inactive"}
-                            onChange={(e) => setFormData({...formData, status: e.target.value})}
-                            className="hidden" 
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                            className="hidden"
                           />
                           <span className="text-[15px] text-[#1a5b28] dark:text-[#2da94a] font-medium">{t("inactive")}</span>
                         </label>
@@ -441,51 +446,72 @@ export default function DocumentTypePage() {
                     </div>
                   </div>
                   {/* Right Flow Builder Panel */}
-                  <div className="w-full lg:w-2/3 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-8 shadow-sm flex flex-col min-h-[500px]">
-                    <div className="relative ml-3 space-y-10 pb-4">
+                  <div className="w-full lg:w-2/3 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-8 shadow-sm flex flex-col h-fit">
+                    <div className="relative ml-3 space-y-6 pb-4">
                       {steps.map((step, idx) => (
                         <div key={idx} className="relative pl-10 flex items-center gap-4 w-full max-w-[800px]">
-                          {/* Green Dot Indicator */}
-                          <div className="absolute w-[20px] h-[20px] rounded-full bg-[#1a5b28] dark:bg-[#2da94a] -left-[10px] top-1/2 -translate-y-1/2 z-10"></div>
-                          {idx !== steps.length - 1 && (
-                            <div className="absolute left-[-1px] top-1/2 w-[2px] h-[calc(100%+2.5rem)] bg-gray-200 dark:bg-[#242B36] z-0"></div>
-                          )}
-                          
-                          <div className="flex-1">
-                            <select
-                              value={step.department}
-                              onChange={(e) => handleStepChange(idx, "department", e.target.value)}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] dark:focus:border-[#2da94a] outline-none text-[15px] bg-gray-50/50 dark:bg-[#242B36] cursor-pointer text-gray-600 dark:text-white appearance-none"
-                              style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
-                            >
-                              <option value="" disabled>{t("select_department")}</option>
-                              {availableDepartments.map(d => <option key={d} value={d} className="text-black dark:text-white">{d}</option>)}
-                            </select>
+                          {/* Step Number Indicator */}
+                          <div className="absolute w-8 h-8 rounded-full bg-green-55 dark:bg-[#123015] border-2 border-[#1a5b28] dark:border-[#2da94a] -left-[16px] top-1/2 -translate-y-1/2 z-10 flex items-center justify-center text-xs font-black text-[#1a5b28] dark:text-[#2da94a] shadow-2xs">
+                            {idx + 1}
                           </div>
-                          
-                          <div className="text-gray-500 dark:text-[#a1a1aa] font-bold text-xl px-1">→</div>
-                          
-                          <div className="flex-1">
-                            <select
-                              disabled
-                              value={step.userSign}
-                              onChange={(e) => handleStepChange(idx, "userSign", e.target.value)}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-[#2A2F3A] outline-none text-[15px] cursor-not-allowed text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#161B22]/50 appearance-none"
-                              style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239ca3af%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
-                            >
-                              <option value="" disabled>{t("select_user_sign")}</option>
-                              {availableUsers.map(u => <option key={u} value={u} className="text-black dark:text-white">{u}</option>)}
-                            </select>
+                          {idx !== steps.length - 1 && (
+                            <div className="absolute left-[-1px] top-1/2 w-[2px] h-[calc(100%+1.5rem)] bg-gray-200 dark:bg-[#2A2F3A] z-0"></div>
+                          )}
+
+                          {/* Step Card Container */}
+                          <div className="flex-1 bg-gray-50/50 dark:bg-[#242B36]/30 border border-gray-150 dark:border-[#2A2F3A] rounded-xl p-4 flex items-center gap-4 hover:border-[#1a5b28]/30 dark:hover:border-[#2da94a]/30 transition-colors shadow-2xs">
+                            <div className="flex-1">
+                              <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5 pl-0.5">Department</label>
+                              <div className="relative">
+                                <SearchableSelect
+                                  options={availableDepartments}
+                                  value={step.department}
+                                  onChange={(e) => handleStepChange(idx, "department", e.target.value)}
+                                  placeholder="Search department..."
+                                  selectPlaceholder={t("select_department")}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="text-gray-400 dark:text-[#a1a1aa] font-bold text-lg pt-5 flex-shrink-0">&rarr;</div>
+
+                            <div className="flex-1">
+                              <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5 pl-0.5">Signature User</label>
+                              <div className="relative">
+                                <SearchableSelect
+                                  options={availableUsers}
+                                  value={step.userSign}
+                                  onChange={(e) => handleStepChange(idx, "userSign", e.target.value)}
+                                  disabled={true}
+                                  placeholder="Search user..."
+                                  selectPlaceholder={t("select_user_sign")}
+                                />
+                              </div>
+                            </div>
+
+                            {steps.length > 1 && (
+                              <div className="pt-5 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => removeStep(idx)}
+                                  className="p-2.5 rounded-lg border border-red-200 dark:border-red-900/30 text-red-500 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 transition-all duration-200 cursor-pointer flex items-center justify-center"
+                                  title="Delete Step"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="pl-14 mt-8 flex w-full max-w-[800px] justify-center">
+                    <div className="pl-10 mt-6 flex w-full max-w-[800px] justify-center">
                       <button
+                        type="button"
                         onClick={addStep}
-                        className="w-[200px] py-2 border border-gray-400 dark:border-[#2A2F3A] border-dashed rounded-md text-[14px] text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors bg-gray-100/50 dark:bg-[#242B36]"
+                        className="w-[200px] py-2.5 border-2 border-dashed border-[#1a5b28]/45 dark:border-[#2da94a]/30 hover:border-[#1a5b28] dark:hover:border-[#2da94a] rounded-xl text-[13.5px] font-bold text-[#1a5b28] dark:text-[#34d399] bg-[#1a5b28]/5 dark:bg-[#2da94a]/5 hover:bg-[#1a5b28]/10 dark:hover:bg-[#2da94a]/10 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99]"
                       >
-                        {t("add_more")}
+                        <span className="text-base font-bold">+</span> {t("add_more")}
                       </button>
                     </div>
                   </div>
@@ -507,7 +533,7 @@ export default function DocumentTypePage() {
                 </div>
               </div>
             )}
-            
+
           </div>
         </main>
       </div>

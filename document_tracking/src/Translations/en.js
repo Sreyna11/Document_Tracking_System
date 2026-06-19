@@ -417,5 +417,8 @@ export const en = {
   "step_taking_longest_time": "Step Taking Longest Time",
   "time_spent": "Time Spent",
   "step_prefix": "The",
-  "step_is_taking_longest": "step is taking the longest."
+  "step_is_taking_longest": "step is taking the longest.",
+  "crop_profile_photo": "Crop Profile Photo",
+  "drag_to_position": "Drag to reposition photo",
+  "confirm": "Confirm"
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import {
@@ -29,12 +29,13 @@ import {
 import AlertModal from "../../../components/AlertModal";
 import BulkActionBar from "../../../components/BulkActionBar";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
 import Pagination from "../../../components/Pagination";
 import DeleteConfirmationModal from "../../../components/DeleteConfirmationModal";
 export default function ReceivedPage() {
     const router = useRouter();
     const { t } = useLanguage();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
     const [isMounted, setIsMounted] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     // Data states
@@ -278,7 +279,7 @@ export default function ReceivedPage() {
         return () => {
             window.removeEventListener("storage", handleStorageChange);
         };
-    }, [router]);
+    }, []);
     // Filter requests based on logged in user's mainRole department and search term
     useEffect(() => {
         if (!currentUser) return;
@@ -1174,7 +1175,7 @@ export default function ReceivedPage() {
                                                 <div className="flex items-center gap-3 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-2.5 shadow-xs min-w-[240px] z-10 relative">
                                                     {nodePhoto ? (
                                                         <div className="w-12 h-12 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-white dark:bg-[#242B36] p-0.5 flex-shrink-0">
-                                                            <img src={nodePhoto} className="w-full h-full rounded-md object-cover" alt={stepUser} />
+                                                            <img src={nodePhoto} className="w-full h-full rounded-md object-cover object-top" alt={stepUser} />
                                                         </div>
                                                     ) : (
                                                         <div className="w-12 h-12 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-white dark:bg-[#242B36] flex flex-col items-center justify-end flex-shrink-0 overflow-hidden">
@@ -1268,7 +1269,7 @@ export default function ReceivedPage() {
                                                                 >
                                                                     <div className="flex items-center gap-3 w-[75%]">
                                                                         {getSenderPhoto(req) ? (
-                                                                            <img src={getSenderPhoto(req)} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                                                            <img src={getSenderPhoto(req)} className="w-8 h-8 rounded-full object-cover object-top shrink-0" />
                                                                         ) : (
                                                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${isFailed ? 'bg-green-400' : isReturned ? 'bg-purple-400' : isSender ? 'bg-pink-400' : 'bg-yellow-500'}`}>
                                                                                 {getDisplaySenderName(req).split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
@@ -1378,7 +1379,7 @@ export default function ReceivedPage() {
                                     <div className="flex flex-col pb-4">
                                         <div className="flex items-center gap-3 mb-4">
                                             {getSenderPhoto(selectedRequest) ? (
-                                                <img src={getSenderPhoto(selectedRequest)} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                                <img src={getSenderPhoto(selectedRequest)} className="w-8 h-8 rounded-full object-cover object-top shrink-0" />
                                             ) : (
                                                 <div className="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
                                                     {getDisplaySenderName(selectedRequest).split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}

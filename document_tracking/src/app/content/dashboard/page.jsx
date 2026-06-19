@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
 import {
     AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
     BarChart, Bar, Cell
@@ -40,7 +41,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 export default function DashboardPage() {
     const router = useRouter();
     const { t } = useLanguage();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
     const [isMounted, setIsMounted] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [usersList, setUsersList] = useState([]);
@@ -315,7 +316,7 @@ export default function DashboardPage() {
         };
         window.addEventListener("storage", handleStorageChange);
         return () => window.removeEventListener("storage", handleStorageChange);
-    }, [router, selectedMonth, chartTimeframe]);
+    }, [selectedMonth, chartTimeframe]);
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return "Good morning";
@@ -408,7 +409,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-500 dark:text-orange-400">
                                     <Bell size={16} />
                                 </div>
-                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("actions_required") || "Action Required"}</h3>
+                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("actions_required") || "Action Required"}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.actionRequired}</div>
                             <div className="text-xs font-semibold text-orange-500 dark:text-orange-400 mt-1 flex items-center gap-1">{t("requires_attention")} <ChevronRight size={12} /></div>
@@ -419,7 +420,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
                                     <FileText size={16} />
                                 </div>
-                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("total")} {t("sent")}</h3>
+                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("total")} {t("sent")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.totalSent}</div>
                             <div className="text-xs font-semibold text-purple-500 dark:text-purple-400 mt-1 flex items-center gap-1">{t("documents_initiated")} <ChevronRight size={12} /></div>
@@ -430,7 +431,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500 dark:text-emerald-400">
                                     <CheckCircle size={16} />
                                 </div>
-                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("completed_stat") || t("completed")}</h3>
+                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("completed_stat") || t("completed")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.completed}</div>
                             <div className="text-xs font-semibold text-emerald-500 dark:text-emerald-400 mt-1 flex items-center gap-1">{t("successfully_finished")} <ChevronRight size={12} /></div>
@@ -441,7 +442,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400">
                                     <XCircle size={16} />
                                 </div>
-                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("returned_failed")}</h3>
+                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("returned_failed")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.returned}</div>
                             <div className="text-xs font-semibold text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1">{t("needs_corrections")} <ChevronRight size={12} /></div>
@@ -452,7 +453,7 @@ export default function DashboardPage() {
                                 <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 dark:text-blue-400">
                                     <Clock size={16} />
                                 </div>
-                                <h3 className="text-[15px] font-bold text-slate-500 dark:text-slate-400">{t("in_progress_stat") || t("in_progress")}</h3>
+                                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("in_progress_stat") || t("in_progress")}</h3>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">{stats.inProgress}</div>
                             <div className="text-xs font-semibold text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">{t("currently_in_process")} <ChevronRight size={12} /></div>
@@ -460,341 +461,341 @@ export default function DashboardPage() {
                     </div>
                     {/* Row 2: Charts and Tables */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Activity Overview */}
-                            <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col min-h-[350px]">
-                                <div className="flex items-center gap-2 mb-6">
-                                    <h3 className="text-base font-extrabold text-slate-800 dark:text-white">{t("activity_overview")}</h3>
-                                </div>
-                                {/* Header: Legend on Left, Toggle on Right */}
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                                    {/* Custom Legend */}
-                                    <div className="flex items-center gap-6">
-                                        <div
-                                            className={`flex items-center gap-2 cursor-pointer group ${!showSent ? 'opacity-40 grayscale' : ''}`}
-                                            onClick={() => setShowSent(!showSent)}
-                                        >
-                                            <div className="w-4 h-4 rounded-full border-2 border-blue-500 flex items-center justify-center bg-white dark:bg-[#161B22] group-hover:bg-blue-50 dark:group-hover:bg-[#242B36] transition-colors">
-                                                <div className={`w-2 h-2 rounded-full bg-blue-500 ${showSent ? 'scale-100' : 'scale-0'} transition-transform`}></div>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-[13px] font-bold text-blue-600 dark:text-blue-400">{t("total")} {t("sent")}</span>
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{t("activity")}</span>
-                                            </div>
+                        {/* Activity Overview */}
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col min-h-[350px]">
+                            <div className="flex items-center gap-2 mb-6">
+                                <h3 className="text-base font-extrabold text-slate-800 dark:text-white">{t("activity_overview")}</h3>
+                            </div>
+                            {/* Header: Legend on Left, Toggle on Right */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                                {/* Custom Legend */}
+                                <div className="flex items-center gap-6">
+                                    <div
+                                        className={`flex items-center gap-2 cursor-pointer group ${!showSent ? 'opacity-40 grayscale' : ''}`}
+                                        onClick={() => setShowSent(!showSent)}
+                                    >
+                                        <div className="w-4 h-4 rounded-full border-2 border-blue-500 flex items-center justify-center bg-white dark:bg-[#161B22] group-hover:bg-blue-50 dark:group-hover:bg-[#242B36] transition-colors">
+                                            <div className={`w-2 h-2 rounded-full bg-blue-500 ${showSent ? 'scale-100' : 'scale-0'} transition-transform`}></div>
                                         </div>
-                                        <div
-                                            className={`flex items-center gap-2 cursor-pointer group ${!showCompleted ? 'opacity-40 grayscale' : ''}`}
-                                            onClick={() => setShowCompleted(!showCompleted)}
-                                        >
-                                            <div className="w-4 h-4 rounded-full border-2 border-green-500 flex items-center justify-center bg-white dark:bg-[#161B22] group-hover:bg-green-50 dark:group-hover:bg-[#242B36] transition-colors">
-                                                <div className={`w-2 h-2 rounded-full bg-green-500 ${showCompleted ? 'scale-100' : 'scale-0'} transition-transform`}></div>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-[13px] font-bold text-green-600 dark:text-green-400">{t("completed_stat") || t("completed")}</span>
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{t("activity")}</span>
-                                            </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[13px] font-bold text-blue-600 dark:text-blue-400">{t("total")} {t("sent")}</span>
+                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{t("activity")}</span>
                                         </div>
                                     </div>
-                                    {/* Day/Week/Month Toggle */}
-                                    <div className="flex bg-slate-50 dark:bg-[#0F1117] p-1 rounded-lg border border-slate-100 dark:border-[#2A2F3A]">
-                                        {['Day', 'Week', 'Month'].map(tf => (
-                                            <button
-                                                key={tf}
-                                                onClick={() => setChartTimeframe(tf)}
-                                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${chartTimeframe === tf ? 'bg-white dark:bg-[#242B36] text-slate-800 dark:text-white shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                                            >
-                                                {tf}
-                                            </button>
-                                        ))}
+                                    <div
+                                        className={`flex items-center gap-2 cursor-pointer group ${!showCompleted ? 'opacity-40 grayscale' : ''}`}
+                                        onClick={() => setShowCompleted(!showCompleted)}
+                                    >
+                                        <div className="w-4 h-4 rounded-full border-2 border-green-500 flex items-center justify-center bg-white dark:bg-[#161B22] group-hover:bg-green-50 dark:group-hover:bg-[#242B36] transition-colors">
+                                            <div className={`w-2 h-2 rounded-full bg-green-500 ${showCompleted ? 'scale-100' : 'scale-0'} transition-transform`}></div>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[13px] font-bold text-green-600 dark:text-green-400">{t("completed_stat") || t("completed")}</span>
+                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{t("activity")}</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex-1 w-full relative">
-                                    {chartData.length === 0 ? (
-                                        <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm font-medium">No activity data available.</div>
-                                    ) : (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id="colorSent" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                                    </linearGradient>
-                                                    <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.1} />
-                                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-[#2A2F3A]" />
-                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} dy={10} />
-                                                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} dx={-10} />
-                                                <RechartsTooltip
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', padding: '8px 12px', fontSize: '12px' }}
-                                                    labelStyle={{ fontWeight: 'bold', color: '#f8fafc', marginBottom: '4px' }}
-                                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
-                                                />
-                                                {showSent && <Area type="monotone" dataKey="Sent" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSent)" activeDot={{ r: 6, strokeWidth: 0, fill: '#3b82f6' }} dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#3b82f6' }} />}
-                                                {showCompleted && <Area type="monotone" dataKey="Completed" stroke="#22c55e" strokeWidth={3} fillOpacity={1} fill="url(#colorCompleted)" activeDot={{ r: 6, strokeWidth: 0, fill: '#22c55e' }} dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#22c55e' }} />}
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    )}
+                                {/* Day/Week/Month Toggle */}
+                                <div className="flex bg-slate-50 dark:bg-[#0F1117] p-1 rounded-lg border border-slate-100 dark:border-[#2A2F3A]">
+                                    {['Day', 'Week', 'Month'].map(tf => (
+                                        <button
+                                            key={tf}
+                                            onClick={() => setChartTimeframe(tf)}
+                                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${chartTimeframe === tf ? 'bg-white dark:bg-[#242B36] text-slate-800 dark:text-white shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                                        >
+                                            {tf}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                            {/* Requests Taking Longest Time */}
-                            <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col min-h-[350px]">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Clock size={18} className="text-rose-500 dark:text-rose-400" />
-                                    <h3 className="text-base font-extrabold text-rose-600 dark:text-rose-400">{t("requests_longest_time")}</h3>
-                                </div>
-                                <div className="flex-1 overflow-x-auto">
-                                    <table className="w-full text-left text-sm whitespace-nowrap">
-                                        <thead>
-                                            <tr className="text-[14px] font-semibold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#2A2F3A]">
-                                                <th className="pb-3 font-bold">{t("type_document")}</th>
-                                                <th className="pb-3 font-bold">{t("title") || "Title"}</th>
-                                                <th className="pb-3 font-bold text-center">{t("total_times")}</th>
-                                                <th className="pb-3 font-bold text-center">{t("action")}</th>
+                            <div className="flex-1 w-full relative">
+                                {chartData.length === 0 ? (
+                                    <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm font-medium">No activity data available.</div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorSent" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                </linearGradient>
+                                                <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.1} />
+                                                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-[#2A2F3A]" />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} dy={10} />
+                                            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }} dx={-10} />
+                                            <RechartsTooltip
+                                                contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', padding: '8px 12px', fontSize: '12px' }}
+                                                labelStyle={{ fontWeight: 'bold', color: '#f8fafc', marginBottom: '4px' }}
+                                                cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
+                                            />
+                                            {showSent && <Area type="monotone" dataKey="Sent" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorSent)" activeDot={{ r: 6, strokeWidth: 0, fill: '#3b82f6' }} dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#3b82f6' }} />}
+                                            {showCompleted && <Area type="monotone" dataKey="Completed" stroke="#22c55e" strokeWidth={3} fillOpacity={1} fill="url(#colorCompleted)" activeDot={{ r: 6, strokeWidth: 0, fill: '#22c55e' }} dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#22c55e' }} />}
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+                        </div>
+                        {/* Requests Taking Longest Time */}
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col min-h-[350px]">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Clock size={18} className="text-rose-500 dark:text-rose-400" />
+                                <h3 className="text-base font-extrabold text-rose-600 dark:text-rose-400">{t("requests_longest_time")}</h3>
+                            </div>
+                            <div className="flex-1 overflow-x-auto">
+                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead>
+                                        <tr className="text-xs font-semibold text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#2A2F3A]">
+                                            <th className="pb-3 font-medium">{t("type_document")}</th>
+                                            <th className="pb-3 font-medium">{t("title") || "Title"}</th>
+                                            <th className="pb-3 font-medium text-center">{t("total_times")}</th>
+                                            <th className="pb-3 font-medium text-center">{t("action")}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-slate-700 dark:text-slate-300">
+                                        {longestApprovalRequests.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="5" className="text-center py-8 text-slate-400 dark:text-slate-500 font-medium">No completed requests found.</td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="text-slate-700 dark:text-slate-300">
-                                            {longestApprovalRequests.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan="5" className="text-center py-8 text-slate-400 dark:text-slate-500 font-medium">No completed requests found.</td>
-                                                </tr>
-                                            ) : longestApprovalRequests.map((req, idx) => (
-                                                <tr
-                                                    key={idx}
-                                                    onClick={() => router.push("/content/tracking-document?id=" + req.id)}
-                                                    className="border-b border-slate-50 dark:border-[#242B36] last:border-none hover:bg-slate-50 dark:hover:bg-[#242B36]/50 transition-colors cursor-pointer"
-                                                >
-                                                    <td className="py-3 pr-4 text-slate-500 dark:text-slate-400">{req.documentType}</td>
-                                                    <td className="py-3 pr-4 font-semibold text-slate-800 dark:text-white max-w-[150px] truncate" title={req.title}>{req.title}</td>
-                                                    <td className="py-3 pl-2 text-center">
-                                                        <span className="px-2 py-1 rounded text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                                                            {req.totalTimeFormatted}
+                                        ) : longestApprovalRequests.map((req, idx) => (
+                                            <tr
+                                                key={idx}
+                                                onClick={() => router.push("/content/tracking-document?id=" + req.id)}
+                                                className="border-b border-slate-50 dark:border-[#242B36] last:border-none hover:bg-slate-50 dark:hover:bg-[#242B36]/50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="py-3 pr-4 text-slate-500 dark:text-slate-400">{req.documentType}</td>
+                                                <td className="py-3 pr-4 font-semibold text-slate-800 dark:text-white max-w-[150px] truncate" title={req.title}>{req.title}</td>
+                                                <td className="py-3 pl-2 text-center">
+                                                    <span className="px-2 py-1 rounded text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                                                        {req.totalTimeFormatted}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 pl-2 text-center">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedLongestReq(req); setShowLongestModal(true); }}
+                                                        className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                                                    >
+                                                        View
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {(!longestApprovalRequests || longestApprovalRequests.length === 0) && (
+                                            <tr>
+                                                <td colSpan="4" className="text-center py-8 text-slate-400 dark:text-slate-500 font-medium">No completed requests found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="mt-auto flex items-start gap-3 p-4 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                <Info size={18} className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
+                                <span className="text-sm font-medium leading-relaxed">
+                                    These requests took the longest time to be processed and completed.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Row 3: Document Type Usage and My Recent Requests */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-10">
+                        {/* Document Type Usage */}
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col h-[420px] lg:col-span-2">
+                            <h3 className="text-base font-extrabold text-slate-800 dark:text-white mb-6">{t("document_type_usage")}</h3>
+                            <div className="flex-1 w-full relative">
+                                {docTypeUsageData.length === 0 ? (
+                                    <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm font-medium">No data available.</div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={docTypeUsageData} margin={{ top: 20, right: 20, left: -20, bottom: 60 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-[#2A2F3A]" />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={<CustomXAxisTick />} interval={0} />
+                                            <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }} />
+                                            <RechartsTooltip
+                                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                                contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', padding: '8px 12px', fontSize: '12px' }}
+                                            />
+                                            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40} label={{ position: 'top', fill: '#64748b', fontSize: 12, fontWeight: 600, dy: -5 }}>
+                                                {docTypeUsageData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+                        </div>
+                        {/* My Recent Requests */}
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col h-[420px] lg:col-span-1">
+                            <h3 className="text-base font-extrabold text-slate-800 dark:text-white mb-4">{t("my_recent_requests")}</h3>
+                            <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2">
+                                {recentRequests.length === 0 ? (
+                                    <div className="text-slate-400 dark:text-slate-500 font-medium text-center py-10">No recent requests found</div>
+                                ) : (
+                                    recentRequests.map((req, idx) => {
+                                        const status = (req.status || "").toLowerCase().trim();
+                                        const isCompleted = status === "completed";
+                                        const isReturned = status === "assigned to improve" || status === "failed";
+                                        return (
+                                            <div key={idx} className="flex flex-col gap-2 p-3.5 rounded-xl border border-slate-100 dark:border-[#2A2F3A] bg-white dark:bg-[#161B22] hover:border-blue-100 dark:hover:border-blue-500/30 hover:shadow-sm transition-all cursor-pointer" onClick={() => router.push("/content/tracking-document?id=" + req.id)}>
+                                                {/* Top Row: ID & Status */}
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 tracking-wider">#{req.trackingNumber || req.id}</span>
+                                                    <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+                                                        isReturned ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' :
+                                                            'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                                                        }`}>
+                                                        {req.status === "In Progressing" ? "In Progress" : req.status || "Pending"}
+                                                    </span>
+                                                </div>
+                                                {/* Middle Row: Title */}
+                                                <h4 className="text-sm font-bold text-slate-800 dark:text-white line-clamp-2 leading-snug pr-2">
+                                                    {req.title || req.subject || req.documentType}
+                                                </h4>
+                                                {/* Bottom Row: Signer Info */}
+                                                <div className="mt-1 pt-2 border-t border-slate-50 dark:border-[#242B36]">
+                                                    {isCompleted ? (
+                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                                                            {t("signed_by")} <span className="font-bold text-slate-700 dark:text-slate-300">{getFallbackSigner(req)}</span> <span className="text-slate-400 dark:text-slate-500 uppercase text-[9px] hidden sm:inline">({getFallbackSignerRole(req)})</span>
                                                         </span>
-                                                    </td>
-                                                    <td className="py-3 pl-2 text-center">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setSelectedLongestReq(req); setShowLongestModal(true); }}
-                                                            className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                                                        >
-                                                            View
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {(!longestApprovalRequests || longestApprovalRequests.length === 0) && (
-                                                <tr>
-                                                    <td colSpan="4" className="text-center py-8 text-slate-400 dark:text-slate-500 font-medium">No completed requests found.</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
+                                                    ) : (
+                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                                                            {t("waiting_sign_by")} <span className="font-bold text-slate-700 dark:text-slate-300">{req.path && req.path[req.currentStepIndex || 0] ? (typeof req.path[req.currentStepIndex || 0] === 'string' ? req.path[req.currentStepIndex || 0] : req.path[req.currentStepIndex || 0].mainRole) : "N/A"}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                {recentRequests.length > 0 && (
+                                    <button className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-center py-2" onClick={() => router.push("/content/tracking-document")}>
+                                        {t("view_all_requests")}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div> {/* Close Row 3 Grid */}
+
+                    {/* Longest Time Request Detail Modal */}
+                    {showLongestModal && selectedLongestReq && (
+                        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-md animate-fade-in p-4 sm:p-6" onClick={() => setShowLongestModal(false)}>
+                            <div className="mx-auto mt-8 sm:mt-12 mb-8 bg-white dark:bg-[#161B22] rounded-2xl shadow-xl border border-slate-100 dark:border-[#2A2F3A] w-full max-w-4xl flex flex-col" onClick={e => e.stopPropagation()}>
+                                {/* Modal Header */}
+                                <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-[#2A2F3A]">
+                                    <h2 className="text-xl font-black text-slate-800 dark:text-white">{t("request_details")}</h2>
+                                    <button
+                                        onClick={() => setShowLongestModal(false)}
+                                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#2A2F3A] rounded-full transition-colors"
+                                    >
+                                        <X size={20} />
+                                    </button>
                                 </div>
-                                <div className="mt-auto flex items-start gap-3 p-4 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30">
-                                    <Info size={18} className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
-                                    <span className="text-sm font-medium leading-relaxed">
-                                        These requests took the longest time to be processed and completed.
-                                    </span>
+                                {/* Modal Body */}
+                                <div className="p-6 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-white dark:bg-[#0F1117] rounded-b-2xl">
+                                    {/* Left Panel: Request Taking Longest */}
+                                    <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-purple-500"></div>
+                                        <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">{t("request_taking_longest") || "Request Taking Longest"}</h3>
+                                        <div className="flex items-start gap-4 mb-8">
+                                            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+                                                <FileText size={20} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-lg font-black text-slate-800 dark:text-white leading-tight">{selectedLongestReq.title || selectedLongestReq.subject}</h4>
+                                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 mt-2 border border-purple-200 dark:border-purple-800/50">
+                                                    {selectedLongestReq.trackingNumber || selectedLongestReq.id}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col gap-5 mb-8 flex-1">
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("requested_by")}</div>
+                                                <div className="text-sm font-semibold text-slate-800 dark:text-white">{selectedLongestReq.senderDepartment || "Unknown Department"}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("requested_on")}</div>
+                                                <div className="text-sm font-semibold text-slate-800 dark:text-white">
+                                                    {selectedLongestReq.date ? new Date(selectedLongestReq.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : "Unknown Date"}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("current_step")}</div>
+                                                <div className="text-sm font-semibold text-slate-800 dark:text-white">
+                                                    {selectedLongestReq.path && selectedLongestReq.path.length > 0
+                                                        ? (typeof selectedLongestReq.path[selectedLongestReq.path.length - 1] === 'string'
+                                                            ? selectedLongestReq.path[selectedLongestReq.path.length - 1]
+                                                            : selectedLongestReq.path[selectedLongestReq.path.length - 1].department || selectedLongestReq.path[selectedLongestReq.path.length - 1].mainRole)
+                                                        : "Completed"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-auto flex items-center justify-between p-4 bg-white dark:bg-[#161B22] rounded-xl border border-slate-100 dark:border-[#2A2F3A]">
+                                            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm">
+                                                <Clock size={16} />
+                                                Total Time Elapsed
+                                            </div>
+                                            <div className="px-3 py-1 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold text-sm">
+                                                {selectedLongestReq.totalTimeFormatted}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Right Panel: Step Taking Longest Time */}
+                                    <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
+                                        <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">Step Taking Longest Time</h3>
+
+                                        <div className="overflow-hidden border border-slate-100 dark:border-[#2A2F3A] rounded-xl mb-6">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                <thead className="bg-white dark:bg-[#161B22]">
+                                                    <tr className="text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider">
+                                                        <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">Step</th>
+                                                        <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">Department</th>
+                                                        <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A] text-right">Time Spent</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-[#2A2F3A] font-medium text-slate-700 dark:text-slate-300">
+                                                    {selectedLongestReq.stepsDetail?.map((step, idx) => (
+                                                        <tr key={idx} className="bg-white dark:bg-transparent">
+                                                            <td className="px-4 py-3.5 text-slate-600 dark:text-slate-400">{step.index}. {step.name}</td>
+                                                            <td className="px-4 py-3.5 text-slate-800 dark:text-white font-semibold">{step.department}</td>
+                                                            <td className="px-4 py-3.5 text-right">
+                                                                {step.timeMs > 0 ? (
+                                                                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${step.timeMs === selectedLongestReq.longestStepMs ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-[#161B22] text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700'}`}>
+                                                                        {step.timeFormatted}
+                                                                    </span>
+                                                                ) : <span className="text-slate-400 dark:text-slate-600 font-bold">—</span>}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {(!selectedLongestReq.stepsDetail || selectedLongestReq.stepsDetail.length === 0) && (
+                                                        <tr>
+                                                            <td colSpan="3" className="px-4 py-8 text-center text-slate-400 dark:text-slate-500 font-medium">No step details available</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="mt-auto flex items-start gap-3 p-4 bg-white dark:bg-[#161B22] text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
+                                            <Info size={18} className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
+                                            <span className="text-sm font-medium leading-relaxed">
+                                                The <strong className="font-bold">{selectedLongestReq.longestStepName}</strong> step is taking the longest.
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* Row 3: Document Type Usage and My Recent Requests */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-10">
-                            {/* Document Type Usage */}
-                            <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col h-[420px] lg:col-span-2">
-                                <h3 className="text-base font-extrabold text-slate-800 dark:text-white mb-6">{t("document_type_usage")}</h3>
-                                <div className="flex-1 w-full relative">
-                                    {docTypeUsageData.length === 0 ? (
-                                        <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm font-medium">No data available.</div>
-                                    ) : (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={docTypeUsageData} margin={{ top: 20, right: 20, left: -20, bottom: 60 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-[#2A2F3A]" />
-                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={<CustomXAxisTick />} interval={0} />
-                                                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }} />
-                                                <RechartsTooltip
-                                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                                    contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3)', padding: '8px 12px', fontSize: '12px' }}
-                                                />
-                                                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40} label={{ position: 'top', fill: '#64748b', fontSize: 12, fontWeight: 600, dy: -5 }}>
-                                                    {docTypeUsageData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    )}
-                                </div>
-                            </div>
-                            {/* My Recent Requests */}
-                            <div className="bg-white dark:bg-[#161B22] rounded-xl p-6 shadow-sm border border-slate-100 dark:border-[#2A2F3A] flex flex-col h-[420px] lg:col-span-1">
-                                <h3 className="text-base font-extrabold text-slate-800 dark:text-white mb-4">{t("my_recent_requests")}</h3>
-                                <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2">
-                                    {recentRequests.length === 0 ? (
-                                        <div className="text-slate-400 dark:text-slate-500 font-medium text-center py-10">No recent requests found</div>
-                                    ) : (
-                                        recentRequests.map((req, idx) => {
-                                            const status = (req.status || "").toLowerCase().trim();
-                                            const isCompleted = status === "completed";
-                                            const isReturned = status === "assigned to improve" || status === "failed";
-                                            return (
-                                                <div key={idx} className="flex flex-col gap-2 p-3.5 rounded-xl border border-slate-100 dark:border-[#2A2F3A] bg-white dark:bg-[#161B22] hover:border-blue-100 dark:hover:border-blue-500/30 hover:shadow-sm transition-all cursor-pointer" onClick={() => router.push("/content/tracking-document?id=" + req.id)}>
-                                                    {/* Top Row: ID & Status */}
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 tracking-wider">#{req.trackingNumber || req.id}</span>
-                                                        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isCompleted ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
-                                                            isReturned ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400' :
-                                                                'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                                            }`}>
-                                                            {req.status === "In Progressing" ? "In Progress" : req.status || "Pending"}
-                                                        </span>
-                                                    </div>
-                                                    {/* Middle Row: Title */}
-                                                    <h4 className="text-sm font-bold text-slate-800 dark:text-white line-clamp-2 leading-snug pr-2">
-                                                        {req.title || req.subject || req.documentType}
-                                                    </h4>
-                                                    {/* Bottom Row: Signer Info */}
-                                                    <div className="mt-1 pt-2 border-t border-slate-50 dark:border-[#242B36]">
-                                                        {isCompleted ? (
-                                                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
-                                                                {t("signed_by")} <span className="font-bold text-slate-700 dark:text-slate-300">{getFallbackSigner(req)}</span> <span className="text-slate-400 dark:text-slate-500 uppercase text-[9px] hidden sm:inline">({getFallbackSignerRole(req)})</span>
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
-                                                                {t("waiting_sign_by")} <span className="font-bold text-slate-700 dark:text-slate-300">{req.path && req.path[req.currentStepIndex || 0] ? (typeof req.path[req.currentStepIndex || 0] === 'string' ? req.path[req.currentStepIndex || 0] : req.path[req.currentStepIndex || 0].mainRole) : "N/A"}</span>
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                    {recentRequests.length > 0 && (
-                                        <button className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-center py-2" onClick={() => router.push("/content/tracking-document")}>
-                                            {t("view_all_requests")}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div> {/* Close Row 3 Grid */}
-                        
-                        {/* Longest Time Request Detail Modal */}
-                            {showLongestModal && selectedLongestReq && (
-                                <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/50 backdrop-blur-md animate-fade-in p-4 sm:p-6" onClick={() => setShowLongestModal(false)}>
-                                    <div className="mx-auto mt-8 sm:mt-12 mb-8 bg-white dark:bg-[#161B22] rounded-2xl shadow-xl border border-slate-100 dark:border-[#2A2F3A] w-full max-w-4xl flex flex-col" onClick={e => e.stopPropagation()}>
-                                        {/* Modal Header */}
-                                        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-[#2A2F3A]">
-                                            <h2 className="text-xl font-black text-slate-800 dark:text-white">{t("request_details")}</h2>
-                                            <button
-                                                onClick={() => setShowLongestModal(false)}
-                                                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#2A2F3A] rounded-full transition-colors"
-                                            >
-                                                <X size={20} />
-                                            </button>
-                                        </div>
-                                        {/* Modal Body */}
-                                        <div className="p-6 flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-white dark:bg-[#0F1117] rounded-b-2xl">
-                                            {/* Left Panel: Request Taking Longest */}
-                                            <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-purple-500"></div>
-                                                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">{t("request_taking_longest") || "Request Taking Longest"}</h3>
-                                                <div className="flex items-start gap-4 mb-8">
-                                                    <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
-                                                        <FileText size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="text-lg font-black text-slate-800 dark:text-white leading-tight">{selectedLongestReq.title || selectedLongestReq.subject}</h4>
-                                                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 mt-2 border border-purple-200 dark:border-purple-800/50">
-                                                            {selectedLongestReq.trackingNumber || selectedLongestReq.id}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col gap-5 mb-8 flex-1">
-                                                    <div>
-                                                        <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("requested_by")}</div>
-                                                        <div className="text-sm font-semibold text-slate-800 dark:text-white">{selectedLongestReq.senderDepartment || "Unknown Department"}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("requested_on")}</div>
-                                                        <div className="text-sm font-semibold text-slate-800 dark:text-white">
-                                                            {selectedLongestReq.date ? new Date(selectedLongestReq.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : "Unknown Date"}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("current_step")}</div>
-                                                        <div className="text-sm font-semibold text-slate-800 dark:text-white">
-                                                            {selectedLongestReq.path && selectedLongestReq.path.length > 0
-                                                                ? (typeof selectedLongestReq.path[selectedLongestReq.path.length - 1] === 'string'
-                                                                    ? selectedLongestReq.path[selectedLongestReq.path.length - 1]
-                                                                    : selectedLongestReq.path[selectedLongestReq.path.length - 1].department || selectedLongestReq.path[selectedLongestReq.path.length - 1].mainRole)
-                                                                : "Completed"}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="mt-auto flex items-center justify-between p-4 bg-white dark:bg-[#161B22] rounded-xl border border-slate-100 dark:border-[#2A2F3A]">
-                                                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm">
-                                                        <Clock size={16} />
-                                                        {t("total_time_elapsed") || "Total Time Elapsed"}
-                                                    </div>
-                                                    <div className="px-3 py-1 rounded bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold text-sm">
-                                                        {selectedLongestReq.totalTimeFormatted}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* Right Panel: Step Taking Longest Time */}
-                                            <div className="bg-white dark:bg-[#0B0D12] rounded-xl p-6 border border-slate-200 dark:border-[#2A2F3A] shadow-sm flex flex-col relative overflow-hidden">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
-                                                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">{t("step_taking_longest_time") || "Step Taking Longest Time"}</h3>
-
-                                                <div className="overflow-hidden border border-slate-100 dark:border-[#2A2F3A] rounded-xl mb-6">
-                                                    <table className="w-full text-left text-sm whitespace-nowrap">
-                                                        <thead className="bg-white dark:bg-[#161B22]">
-                                                            <tr className="text-slate-500 dark:text-slate-400 font-bold text-[11px] uppercase tracking-wider">
-                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">{t("step") || "Step"}</th>
-                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A]">{t("department") || "Department"}</th>
-                                                                <th className="px-4 py-3 border-b border-slate-100 dark:border-[#2A2F3A] text-right">{t("time_spent") || "Time Spent"}</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100 dark:divide-[#2A2F3A] font-medium text-slate-700 dark:text-slate-300">
-                                                            {selectedLongestReq.stepsDetail?.map((step, idx) => (
-                                                                <tr key={idx} className="bg-white dark:bg-transparent">
-                                                                    <td className="px-4 py-3.5 text-slate-600 dark:text-slate-400">{step.index}. {step.name}</td>
-                                                                    <td className="px-4 py-3.5 text-slate-800 dark:text-white font-semibold">{step.department}</td>
-                                                                    <td className="px-4 py-3.5 text-right">
-                                                                        {step.timeMs > 0 ? (
-                                                                            <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${step.timeMs === selectedLongestReq.longestStepMs ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-[#161B22] text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700'}`}>
-                                                                                {step.timeFormatted}
-                                                                            </span>
-                                                                        ) : <span className="text-slate-400 dark:text-slate-600 font-bold">—</span>}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                            {(!selectedLongestReq.stepsDetail || selectedLongestReq.stepsDetail.length === 0) && (
-                                                                <tr>
-                                                                    <td colSpan="3" className="px-4 py-8 text-center text-slate-400 dark:text-slate-500 font-medium">No step details available</td>
-                                                                </tr>
-                                                            )}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                <div className="mt-auto flex items-start gap-3 p-4 bg-white dark:bg-[#161B22] text-blue-600 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
-                                                    <Info size={18} className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
-                                                    <span className="text-sm font-medium leading-relaxed">
-                                                        {t("step_prefix") || "The"} <strong className="font-bold">{selectedLongestReq.longestStepName}</strong> {t("step_is_taking_longest") || "step is taking the longest."}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                    </div>
-                </main>
-            </div>
+                    )}
+                </div>
+            </main>
+        </div>
     );
 }

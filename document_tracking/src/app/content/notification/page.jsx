@@ -1,15 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { Bell, Inbox, FileText, Calendar, CheckCircle2, X, AlertCircle, ImageIcon, MoreVertical, Paperclip } from "lucide-react";
 import AlertModal from "../../../components/AlertModal";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
 export default function NotificationPage() {
   const router = useRouter();
   const { t } = useLanguage();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -40,7 +41,7 @@ export default function NotificationPage() {
     } catch (e) {
       console.error(e);
     }
-  }, [router]);
+  }, []);
   useEffect(() => {
     if (!currentUser) return;
     const loadNotifications = (storageData) => {
@@ -243,7 +244,7 @@ export default function NotificationPage() {
                           <img
                             src={getSenderPhoto(notif.senderName)}
                             alt={notif.senderName}
-                            className="w-14 h-14 rounded-full object-cover border border-gray-200 shadow-2xs"
+                            className="w-14 h-14 rounded-full object-cover object-top border border-gray-200 shadow-2xs"
                           />
                         ) : (
                           <div className="w-14 h-14 rounded-full border border-gray-200 shadow-2xs flex-shrink-0 flex items-center justify-center bg-gray-100 overflow-hidden text-gray-500 font-bold text-xl uppercase">
@@ -257,11 +258,10 @@ export default function NotificationPage() {
                           <h3 className="text-[17px] font-bold text-gray-800 truncate">{notif.senderName}</h3>
                           {!notif.read && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
                           {(notif.priorityLevel || "Normal") && (
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              (notif.priorityLevel || "").toLowerCase() === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200' : 
-                              (notif.priorityLevel || "").toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 
-                              'bg-blue-100 text-blue-700 border border-blue-200'
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${(notif.priorityLevel || "").toLowerCase() === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200' :
+                                (notif.priorityLevel || "").toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                                  'bg-blue-100 text-blue-700 border border-blue-200'
+                              }`}>
                               {notif.priorityLevel || "Normal"}
                             </span>
                           )}
