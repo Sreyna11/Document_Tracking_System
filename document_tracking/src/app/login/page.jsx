@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import { Eye, EyeOff, User, Lock, LogIn, Loader2, Mail, UserPlus } from "lucide-react";
 export default function LoginPage() {
     const router = useRouter();

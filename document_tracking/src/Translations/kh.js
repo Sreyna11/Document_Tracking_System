@@ -318,7 +318,7 @@ export const km = {
   "phone": "លេខទូរស័ព្ទ",
   "alert_main_role_exists": "តួនាទីចម្បងមានរួចហើយ។",
   "alert_sub_role_exists": "តួនាទីមានរួចហើយនៅក្នុងតួនាទីចម្បងនេះ។",
-  "job_department": "ដេប៉ាតឺម៉ង់ការងារ",
+  "job_department": "ផ្នែកការងារ",
   "no_job_departments_found": "រកមិនឃើញនាយកដ្ឋានការងារទេ។",
   "create_job_department": "បង្កើតនាយកដ្ឋានការងារ",
   "edit_job_department": "កែប្រែនាយកដ្ឋានការងារ",
@@ -409,6 +409,8 @@ export const km = {
   "thursday":"ថ្ងៃព្រហស្បតិ៍",
   "friday":"ថ្ងៃសុក្រ",
   "saturday":"ថ្ងៃសៅរ៍",
-  "sunday":"ថ្ងៃអាទិត្យ"
-  
+  "sunday":"ថ្ងៃអាទិត្យ",
+  "crop_profile_photo": "កាត់តម្រឹមរូបថតប្រវត្តិរូប",
+  "drag_to_position": "អូសដើម្បីតម្រង់ទីតាំងរូបថត",
+  "confirm": "បញ្ជាក់"
 }

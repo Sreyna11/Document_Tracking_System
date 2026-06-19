@@ -1,20 +1,21 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
 import { Search, ChevronLeft, ChevronRight, Eye, Calendar, FileText, CheckCircle, XCircle, Clock, AlertCircle, History } from "lucide-react";
 import Pagination from "../../../components/Pagination";
 export default function HistoryPage() {
   const router = useRouter();
   const { t } = useLanguage();
-  
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [requests, setRequests] = useState([]);
-  
+
   // Filters
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
@@ -22,7 +23,7 @@ export default function HistoryPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -35,23 +36,23 @@ export default function HistoryPage() {
     const user = JSON.parse(userStr);
     setCurrentUser(user);
     setIsMounted(true);
-    
+
     // Load historical requests
     const reqs = JSON.parse(localStorage.getItem("doc_tracking_requests") || "[]");
-    
+
     // Filter requests based on user role
     const isGlobalSuperAdmin = user.email === "admin@rupp.edu.kh";
     const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
-    
+
     const relevantRequests = reqs.filter(req => {
       if (isGlobalSuperAdmin) return true;
       const sDept = (req.senderDepartment || "").toLowerCase().trim();
       return userDept && sDept === userDept;
     });
-    
+
     relevantRequests.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     setRequests(relevantRequests);
-  }, [router]);
+  }, []);
   const documentTypes = useMemo(() => {
     const types = new Set();
     requests.forEach(r => {
@@ -71,7 +72,7 @@ export default function HistoryPage() {
           if (!matchesId && !matchesSubject && !matchesSubject2) return false;
         }
       }
-      
+
       // 2. Status Filter
       if (statusFilter !== "all") {
         const status = (req.status || "").toLowerCase().trim();
@@ -81,12 +82,12 @@ export default function HistoryPage() {
         } else if (filterVal === "returned") {
           if (status !== "assigned to improve" && status !== "returned") return false;
         } else if (filterVal === "declined") {
-           if (status !== "failed" && status !== "declined" && status !== "rejected") return false;
+          if (status !== "failed" && status !== "declined" && status !== "rejected") return false;
         } else if (status !== filterVal) {
           return false;
         }
       }
-      
+
       // 3. Type Filter
       if (typeFilter !== "all") {
         if (req.documentType !== typeFilter) return false;
@@ -112,14 +113,14 @@ export default function HistoryPage() {
     let approved = 0;
     let returned = 0;
     let declined = 0;
-    
+
     filteredRequests.forEach(req => {
       const status = (req.status || "").toLowerCase().trim();
       if (status === "completed" || status === "approved") approved++;
       else if (status === "assigned to improve" || status === "returned") returned++;
       else if (status === "failed" || status === "declined" || status === "rejected") declined++;
     });
-    
+
     return { total, approved, returned, declined };
   }, [filteredRequests]);
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage) || 1;
@@ -127,7 +128,7 @@ export default function HistoryPage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, typeFilter, priorityFilter, selectedMonth, selectedYear]);
@@ -174,30 +175,30 @@ export default function HistoryPage() {
   };
   const calculateProcessingTime = (req) => {
     let diffMs = 0;
-    
+
     // Attempt to calculate precise accumulated time across path steps
     if (req.path && req.path.length > 0) {
       req.path.forEach((step, index) => {
         let startStr = index === 0 ? (req.date + (req.time ? ' ' + req.time : '')) : (req.path[index - 1]?.approvedAt || req.date);
         let endStr = step.approvedAt;
-        
+
         // For the active step, calculate up to now
         if (!endStr && index === (req.currentStepIndex || 0) && req.status !== "Completed" && req.status !== "Failed" && req.status !== "Assigned to Improve") {
-           endStr = new Date().toISOString();
+          endStr = new Date().toISOString();
         }
         if (startStr && endStr) {
-           const start = new Date(startStr);
-           const end = new Date(endStr);
-           if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              let stepTime = Math.max(0, end - start);
-              // Fallback if step has a specific accumulated time (e.g. from return loop)
-              if (step.accumulatedTime) {
-                stepTime += step.accumulatedTime;
-              }
-              diffMs += stepTime;
-           }
+          const start = new Date(startStr);
+          const end = new Date(endStr);
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            let stepTime = Math.max(0, end - start);
+            // Fallback if step has a specific accumulated time (e.g. from return loop)
+            if (step.accumulatedTime) {
+              stepTime += step.accumulatedTime;
+            }
+            diffMs += stepTime;
+          }
         } else if (step.accumulatedTime) {
-           diffMs += step.accumulatedTime;
+          diffMs += step.accumulatedTime;
         }
       });
     }
@@ -208,20 +209,20 @@ export default function HistoryPage() {
       const end = req.completedDate ? new Date(req.completedDate) : new Date();
       diffMs = Math.max(0, end - start);
     }
-    
+
     if (diffMs === 0) return "< 1m";
     const diffSecs = Math.floor(diffMs / 1000);
     const days = Math.floor(diffSecs / 86400);
     const hours = Math.floor((diffSecs % 86400) / 3600);
     const mins = Math.floor((diffSecs % 3600) / 60);
     const secs = diffSecs % 60;
-    
+
     let parts = [];
     if (days > 0) parts.push(`${days}d`);
     if (hours > 0) parts.push(`${hours}h`);
     if (mins > 0) parts.push(`${mins}m`);
     if (parts.length === 0 || (days === 0 && hours === 0)) parts.push(`${secs}s`);
-    
+
     return parts.join(' ');
   };
   const getLastReceiver = (req) => {
@@ -236,7 +237,7 @@ export default function HistoryPage() {
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
       <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} currentUser={currentUser} />
-        
+
         <div className="p-8 md:p-10 flex-1 w-full mx-auto overflow-x-auto">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -245,7 +246,7 @@ export default function HistoryPage() {
                 History Requests
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View and manage your historical document requests and their final statuses.</p>
-      
+
             </div>
           </div>
           {/* Summary Cards */}
@@ -259,7 +260,7 @@ export default function HistoryPage() {
                 <span className="text-[24px] font-black text-gray-900 dark:text-white leading-tight">{summary.total}</span>
               </div>
             </div>
-            
+
             <div className="bg-white dark:bg-[#161B22] p-5 rounded-xl border border-gray-100 dark:border-[#2A2F3A] shadow-sm flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center">
                 <CheckCircle size={24} />
@@ -290,7 +291,7 @@ export default function HistoryPage() {
           </div>
           {/* Filters & Table Container */}
           <div className="bg-white dark:bg-[#161B22] border border-gray-100 dark:border-[#2A2F3A] rounded-xl shadow-sm flex flex-col">
-            
+
             {/* Search Section */}
             <div className="p-4 border-b border-gray-100 dark:border-[#2A2F3A] flex justify-end">
               <div className="relative w-full md:w-1/3">
@@ -381,7 +382,7 @@ export default function HistoryPage() {
                   {paginatedRequests.map((req) => {
                     const senderNameRaw = req.senderName || req.senderEmail || 'Unknown';
                     const englishSender = senderNameRaw.replace(/[ក-៯]+/g, '').replace(/\//g, '').trim() || senderNameRaw;
-                    
+
                     let receiverRaw = getLastReceiver(req);
                     if (req.path && req.path.length > 0) {
                       const lastStep = req.path[req.path.length - 1];
@@ -391,21 +392,21 @@ export default function HistoryPage() {
                     const d = new Date(req.date || 0);
                     const formattedDate = !isNaN(d.getTime()) ? `${d.getDate()}, ${d.toLocaleString('default', { month: 'long' })}, ${d.getFullYear()}` : req.date;
                     return (
-                    <tr 
-                      key={req.id} 
-                      onClick={() => router.push(`/content/tracking-document?id=${req.id}`)}
-                      className="hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-mono font-bold text-gray-500">{req.id || 'N/A'}</td>
-                      <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">{req.documentType}</td>
-                      <td className="py-3 px-4 text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title={req.title || req.subject}>{req.title || req.subject}</td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{englishSender}</td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{englishReceiver}</td>
-                      <td className="py-3 px-4 text-center">{getStatusBadge(req.status)}</td>
-                      <td className="py-3 px-4">{getPriorityBadge(req.priorityLevel)}</td>
-                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formattedDate}</td>
-                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap font-medium flex items-center gap-1.5"><Clock size={13} className="text-blue-500" />{calculateProcessingTime(req)}</td>
-                    </tr>
+                      <tr
+                        key={req.id}
+                        onClick={() => router.push(`/content/tracking-document?id=${req.id}`)}
+                        className="hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors cursor-pointer"
+                      >
+                        <td className="py-3 px-4 font-mono font-bold text-gray-500">{req.id || 'N/A'}</td>
+                        <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">{req.documentType}</td>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title={req.title || req.subject}>{req.title || req.subject}</td>
+                        <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{englishSender}</td>
+                        <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{englishReceiver}</td>
+                        <td className="py-3 px-4 text-center">{getStatusBadge(req.status)}</td>
+                        <td className="py-3 px-4">{getPriorityBadge(req.priorityLevel)}</td>
+                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formattedDate}</td>
+                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap font-medium flex items-center gap-1.5"><Clock size={13} className="text-blue-500" />{calculateProcessingTime(req)}</td>
+                      </tr>
                     );
                   })}
                   {paginatedRequests.length === 0 && (
@@ -421,7 +422,7 @@ export default function HistoryPage() {
                   )}
                 </tbody>
               </table>
-              
+
               {/* Pagination */}
               {paginatedRequests.length > 0 && (
                 <Pagination

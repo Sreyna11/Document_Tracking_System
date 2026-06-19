@@ -410,5 +410,8 @@ export const en = {
   "thursday":"Thursday",
   "friday":"Friday",
   "saturday":"Saturday",
-  "sunday":"Sunday"
+  "sunday":"Sunday",
+  "crop_profile_photo": "Crop Profile Photo",
+  "drag_to_position": "Drag to reposition photo",
+  "confirm": "Confirm"
 }

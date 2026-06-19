@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import { hasPermission } from "../../../utils/permissions";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
@@ -25,12 +25,14 @@ import {
 } from "lucide-react";
 import AlertModal from "../../../components/AlertModal";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
 import Pagination from "../../../components/Pagination";
 import DeleteConfirmationModal from "../../../components/DeleteConfirmationModal";
+import SearchableSelect from "../../../components/SearchableSelect";
 export default function AccountPage() {
   const router = useRouter();
   const { t, language } = useLanguage();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [dynamicRoles, setDynamicRoles] = useState([]);
@@ -117,7 +119,7 @@ export default function AccountPage() {
       console.error(e);
     }
     const isGAdmin = user?.email === "admin@rupp.edu.kh";
-      
+
     const adminCheckStr1 = (user?.type || user?.role || "").toLowerCase();
     const isDAdmin = adminCheckStr1.includes("super admin") || adminCheckStr1 === "admin";
     if (!isGAdmin && !isDAdmin) {
@@ -136,21 +138,40 @@ export default function AccountPage() {
       };
       setSelectedUserView(foundUser);
     }
+    let extractedRoles = [];
     try {
-      const storedDynamicRoles = localStorage.getItem("doc_tracking_roles");
-      if (storedDynamicRoles) {
-        setDynamicRoles(JSON.parse(storedDynamicRoles));
-      } else {
-        setDynamicRoles([
-          { title: "Super Admin" }, { title: "Admin" }, { title: "Staff" }
-        ]);
+      const storedDepts = localStorage.getItem("doc_tracking_departments");
+      if (storedDepts) {
+        const parsed = JSON.parse(storedDepts);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(dept => {
+            if (Array.isArray(dept.roles)) {
+              dept.roles.forEach(role => {
+                extractedRoles.push({
+                  title: role.title,
+                  type: role.type || "Staff",
+                  department: dept.title
+                });
+              });
+            }
+          });
+        }
       }
     } catch (e) {
       console.error(e);
-      setDynamicRoles([
-        { title: "Super Admin" }, { title: "Admin" }, { title: "Staff" }
-      ]);
     }
+
+    if (extractedRoles.length === 0) {
+      savedMainRoles.forEach(dept => {
+        extractedRoles.push(
+          { title: "Super Admin", type: "Super Admin", department: dept },
+          { title: "Admin", type: "Admin", department: dept },
+          { title: "Staff", type: "Staff", department: dept }
+        );
+      });
+    }
+    setDynamicRoles(extractedRoles);
+
     if (user.role && (user.role.toLowerCase().includes("super admin") || user.role.toLowerCase() === "admin")) {
       const userDept = user.department || user.mainRole || "Default";
       setSelectedMainRole(userDept);
@@ -158,20 +179,19 @@ export default function AccountPage() {
       setSelectedMainRole(savedMainRoles[0]);
     }
     setIsMounted(true);
-  }, [router]);
+  }, []);
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
-  const getAvailableRoles = (mainRole, currentRole) => {
+  const getAvailableRoles = (mainRole, type, currentRole) => {
     let allowedRoles = dynamicRoles.filter(r => {
-      const rDept = (r.department || "IT Center").toLowerCase().trim();
-      if (mainRole && rDept === mainRole.toLowerCase().trim()) return true;
-      return false;
+      const rDept = (r.department || "").toLowerCase().trim();
+      const rType = (r.type || "").toLowerCase().trim();
+      const targetDept = (mainRole || "").toLowerCase().trim();
+      const targetType = (type || "").toLowerCase().trim();
+      return rDept === targetDept && rType === targetType;
     });
     let roleNames = allowedRoles.map(r => r.title);
-    if (roleNames.length === 0) {
-      roleNames = ["Super Admin", "Admin", "Staff"];
-    }
     if (currentRole && !roleNames.includes(currentRole)) {
       roleNames = [currentRole, ...roleNames];
     }
@@ -199,52 +219,37 @@ export default function AccountPage() {
     setStatus("Active");
     setIsEditMode(false);
     setEditingUserId(null);
+
+    let defaultDept = "";
     if (!isGlobalSuperAdmin) {
-      const allowedDept = currentUser.department || currentUser.mainRole;
-      if (allowedDept) {
-        setSelectedMainRole(allowedDept);
-        const defaultRoles = getAvailableRoles(allowedDept, "");
-        const defRole = defaultRoles.length > 0 ? defaultRoles[0] : "";
-        setSelectedRole(defRole);
-        const roleObj = dynamicRoles.find(r => r.title === defRole);
-        setSelectedType(roleObj?.type || "");
-      } else if (mainRoles.length > 0) {
-        setSelectedMainRole(mainRoles[0]);
-        const defaultRoles = getAvailableRoles(mainRoles[0], "");
-        const defRole = defaultRoles.length > 0 ? defaultRoles[0] : "";
-        setSelectedRole(defRole);
-        const roleObj = dynamicRoles.find(r => r.title === defRole);
-        setSelectedType(roleObj?.type || "");
-      } else {
-        setSelectedMainRole("");
-        setSelectedRole("");
-        setSelectedType("");
-      }
+      defaultDept = currentUser.department || currentUser.mainRole || "";
     } else if (mainRoles.length > 0) {
-      setSelectedMainRole(mainRoles[0]);
-      const defaultRoles = getAvailableRoles(mainRoles[0], "");
-      const defRole = defaultRoles.length > 0 ? defaultRoles[0] : "";
-      setSelectedRole(defRole);
-      const roleObj = dynamicRoles.find(r => r.title === defRole);
-      setSelectedType(roleObj?.type || "");
-    } else {
-      setSelectedMainRole("");
-      setSelectedRole("");
-      setSelectedType("");
+      defaultDept = mainRoles[0];
     }
+
+    setSelectedMainRole(defaultDept);
+    setSelectedType("Super Admin");
+    const defaultRoles = getAvailableRoles(defaultDept, "Super Admin", "");
+    setSelectedRole(defaultRoles.length > 0 ? defaultRoles[0] : "Super Admin");
   };
   const handleMainRoleChange = (e) => {
     const newMainRole = e.target.value;
     setSelectedMainRole(newMainRole);
-    const defaultRoles = getAvailableRoles(newMainRole, "");
-    if (defaultRoles.length > 0) {
-      const defRole = defaultRoles[0];
-      setSelectedRole(defRole);
-      const roleObj = dynamicRoles.find(r => r.title === defRole);
-      setSelectedType(roleObj?.type || "");
+    const rolesForType = getAvailableRoles(newMainRole, selectedType, "");
+    if (rolesForType.length > 0) {
+      setSelectedRole(rolesForType[0]);
     } else {
       setSelectedRole("");
-      setSelectedType("");
+    }
+  };
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    setSelectedType(newType);
+    const rolesForType = getAvailableRoles(selectedMainRole, newType, "");
+    if (rolesForType.length > 0) {
+      setSelectedRole(rolesForType[0]);
+    } else {
+      setSelectedRole("");
     }
   };
   const handlePhotoUpload = (e) => {
@@ -316,7 +321,7 @@ export default function AccountPage() {
       });
       setUsersList(updatedUsers);
       localStorage.setItem("doc_tracking_users", JSON.stringify(updatedUsers));
-      
+
       const sessionUserStr = sessionStorage.getItem("currentUser");
       if (sessionUserStr) {
         const sessionUser = JSON.parse(sessionUserStr);
@@ -448,15 +453,15 @@ export default function AccountPage() {
                   <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-black dark:text-white">{t("account")}</h1>
                     {hasPermission(currentUser, "Account", "Create") && (
-                        <button
-                          onClick={() => { resetForm(); setViewState('CREATE'); }}
-                          className="px-6 py-2 bg-[#1a5b28] hover:bg-[#13461d] text-white text-[14px] font-medium rounded-md transition-colors"
-                        >
-                          {t("new_user") || "New User"}
-                        </button>
+                      <button
+                        onClick={() => { resetForm(); setViewState('CREATE'); }}
+                        className="px-6 py-2 bg-[#1a5b28] hover:bg-[#13461d] text-white text-[14px] font-medium rounded-md transition-colors"
+                      >
+                        {t("new_user") || "New User"}
+                      </button>
                     )}
                   </div>
-                  <div className="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-[#2A2F3A] flex flex-col overflow-hidden">
+                  <div className="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-[#2A2F3A] flex flex-col overflow-hidden md:overflow-visible">
                     <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100 dark:border-[#2A2F3A] bg-white dark:bg-[#161B22]">
                       <div className="w-full md:w-auto">
                         <BulkActionBar
@@ -483,7 +488,7 @@ export default function AccountPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto md:overflow-visible">
                       <table className="w-full text-left text-[14px]">
                         <thead className="bg-gray-50 dark:bg-[#242B36] text-gray-700 dark:text-white font-semibold">
                           <tr className="border-b border-gray-200 dark:border-[#2A2F3A]">
@@ -502,7 +507,7 @@ export default function AccountPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A] bg-white dark:bg-[#161B22] text-gray-700 dark:text-white">
-                          {paginatedUsers.map((user) => {
+                          {paginatedUsers.map((user, idx) => {
                             const isSelected = selectedRows.includes(user.id);
                             return (
                               <tr key={user.id} className={`hover:bg-gray-50/50 dark:hover:bg-[#242B36] transition-colors ${isSelected ? 'bg-green-50/30' : ''}`}>
@@ -513,7 +518,7 @@ export default function AccountPage() {
                                 </td>
                                 <td className="py-3 px-4">
                                   {user.profilePhoto ? (
-                                    <img src={user.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-[#2A2F3A]" />
+                                    <img src={user.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover object-top border border-gray-200 dark:border-[#2A2F3A]" />
                                   ) : (
                                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 dark:text-[#a1a1aa] text-[12px] font-bold flex items-center justify-center border border-gray-300 dark:border-[#2A2F3A]">
                                       {getInitials(user.firstName, user.lastName)}
@@ -535,15 +540,14 @@ export default function AccountPage() {
                                 </td>
                                 <td className="py-3 px-4">
                                   {user.type ? (
-                                    <span className={`inline-flex items-center justify-center px-3 py-1 text-[12px] font-bold rounded-sm ${
-                                      (user.type || '').toLowerCase().includes('super') ? 'bg-green-100 text-green-700' :
-                                      (user.type || '').toLowerCase().includes('admin') ? 'bg-pink-100 text-pink-700' :
-                                      (user.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
-                                      'bg-gray-100 text-gray-700'
-                                    }`}>{user.type}</span>
+                                    <span className={`inline-flex items-center justify-center px-3 py-1 text-[12px] font-bold rounded-sm ${(user.type || '').toLowerCase().includes('super') ? 'bg-green-100 text-green-700' :
+                                        (user.type || '').toLowerCase().includes('admin') ? 'bg-pink-100 text-pink-700' :
+                                          (user.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
+                                            'bg-gray-100 text-gray-700'
+                                      }`}>{user.type}</span>
                                   ) : <span className="text-gray-400 italic text-[11px]">N/A</span>}
                                 </td>
-                                <td className="py-3 px-4 relative">
+                                <td className={`py-3 px-4 relative ${actionMenuOpen === user.id ? 'z-30' : ''}`}>
                                   <div className="flex justify-end relative">
                                     <button
                                       onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
@@ -557,7 +561,8 @@ export default function AccountPage() {
                                           className="fixed inset-0 z-40"
                                           onClick={() => setActionMenuOpen(null)}
                                         />
-                                        <div className="absolute top-full right-0 mt-1 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                        <div className={`absolute right-0 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1 ${(idx === paginatedUsers.length - 1 || (idx === paginatedUsers.length - 2 && paginatedUsers.length >= 3)) ? 'bottom-full mb-1' : 'top-full mt-1'
+                                          }`}>
                                           <button
                                             onClick={() => { setActionMenuOpen(null); setSelectedUserView(user); setViewState('VIEW'); }}
                                             className="w-full text-left px-4 py-2 text-[13px] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36] flex items-center gap-2 transition-colors"
@@ -627,9 +632,9 @@ export default function AccountPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => { 
-                          setViewState('LIST'); 
-                          resetForm(); 
+                        onClick={() => {
+                          setViewState('LIST');
+                          resetForm();
                         }}
                         className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
                       >
@@ -640,201 +645,193 @@ export default function AccountPage() {
                   <form onSubmit={handleFormSubmit} className="flex flex-col gap-6">
                     <div className="flex flex-col md:flex-row gap-6">
                       {/* Left Column */}
-                    <div className="w-full md:w-1/3 flex flex-col gap-6">
-                      <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 flex flex-col items-center shadow-sm">
-                        <h3 className="font-bold text-black dark:text-white mb-4">{t("profile_photo")}</h3>
-                        <label className="w-40 h-40 rounded-full bg-gray-200 dark:bg-[#242B36] border border-dashed border-gray-400 dark:border-[#475569] flex items-center justify-center cursor-pointer relative overflow-hidden group">
-                          <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                          {profilePhoto ? (
-                            <img src={profilePhoto} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-                          ) : (
-                            <div className="bg-white dark:bg-[#161B22] px-3 py-1 rounded text-xs font-bold text-gray-700 dark:text-white shadow-sm z-10 group-hover:bg-gray-100 dark:group-hover:bg-[#2A2F3A]">
-                              Upload
-                            </div>
-                          )}
-                        </label>
-                      </div>
-                      <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 flex flex-col items-center shadow-sm">
-                        <h3 className="font-bold text-black dark:text-white mb-4">{t("upload_signature")}</h3>
-                        <label className="w-full h-32 rounded-lg bg-gray-50 dark:bg-[#242B36] border border-dashed border-gray-300 dark:border-[#475569] flex items-center justify-center cursor-pointer relative overflow-hidden group hover:bg-gray-100 dark:hover:bg-[#2A2F3A] transition-colors">
-                          <input type="file" accept="image/*" onChange={handleSignatureUpload} className="hidden" />
-                          {signaturePhoto ? (
-                            <img src={signaturePhoto} alt="Signature Preview" className="absolute inset-0 w-full h-full object-contain p-2" />
-                          ) : (
-                            <div className="flex flex-col items-center gap-2">
-                              <UploadCloud size={24} className="text-gray-400" />
+                      <div className="w-full md:w-1/3 flex flex-col gap-6">
+                        <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 flex flex-col items-center shadow-sm">
+                          <h3 className="font-bold text-black dark:text-white mb-4">{t("profile_photo")}</h3>
+                          <label className="w-40 h-40 rounded-full bg-gray-200 dark:bg-[#242B36] border border-dashed border-gray-400 dark:border-[#475569] flex items-center justify-center cursor-pointer relative overflow-hidden group">
+                            <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                            {profilePhoto ? (
+                              <img src={profilePhoto} alt="Preview" className="absolute inset-0 w-full h-full object-cover object-top" />
+                            ) : (
                               <div className="bg-white dark:bg-[#161B22] px-3 py-1 rounded text-xs font-bold text-gray-700 dark:text-white shadow-sm z-10 group-hover:bg-gray-100 dark:group-hover:bg-[#2A2F3A]">
-                                Upload Signature
+                                Upload
                               </div>
-                            </div>
-                          )}
-                        </label>
+                            )}
+                          </label>
+                        </div>
+                        <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 flex flex-col items-center shadow-sm">
+                          <h3 className="font-bold text-black dark:text-white mb-4">{t("upload_signature")}</h3>
+                          <label className="w-full h-32 rounded-lg bg-gray-50 dark:bg-[#242B36] border border-dashed border-gray-300 dark:border-[#475569] flex items-center justify-center cursor-pointer relative overflow-hidden group hover:bg-gray-100 dark:hover:bg-[#2A2F3A] transition-colors">
+                            <input type="file" accept="image/*" onChange={handleSignatureUpload} className="hidden" />
+                            {signaturePhoto ? (
+                              <img src={signaturePhoto} alt="Signature Preview" className="absolute inset-0 w-full h-full object-contain p-2" />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2">
+                                <UploadCloud size={24} className="text-gray-400" />
+                                <div className="bg-white dark:bg-[#161B22] px-3 py-1 rounded text-xs font-bold text-gray-700 dark:text-white shadow-sm z-10 group-hover:bg-gray-100 dark:group-hover:bg-[#2A2F3A]">
+                                  Upload Signature
+                                </div>
+                              </div>
+                            )}
+                          </label>
+                        </div>
                       </div>
-                    </div>
-                    {/* Right Column */}
-                    <div className="w-full md:w-2/3 flex flex-col gap-6">
-                      <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 shadow-sm flex-1">
-                        <h3 className="font-bold text-black dark:text-white mb-6 text-lg">{t("user_information")}</h3>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-                          <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("first_name")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={firstName}
-                              onChange={(e) => setFirstName(e.target.value)}
-                              placeholder="ឈ្មោះពេញ"
-                              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("last_name")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={lastName}
-                              onChange={(e) => setLastName(e.target.value)}
-                              placeholder="Fullname"
-                              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("phone")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="tel"
-                              required
-                              value={phone}
-                              onChange={(e) => setPhone(e.target.value)}
-                              placeholder="Phone Number"
-                              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("email_contact")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="email"
-                              required
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              placeholder="Email"
-                              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                              {t("password")} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="password"
-                              required={!isEditMode}
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              placeholder="Password"
-                              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
-                            />
-                          </div>
-                          <div className="col-span-2 pt-2">
-                            <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
-                              Status
-                            </label>
-                            <div className="flex gap-6">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="status"
-                                  checked={status === "Active"}
-                                  onChange={() => setStatus("Active")}
-                                  className="w-4 h-4 text-green-600 border-gray-300 dark:border-[#2A2F3A] focus:ring-green-500"
-                                />
-                                <span className="text-[14px] text-green-700">Active</span>
+                      {/* Right Column */}
+                      <div className="w-full md:w-2/3 flex flex-col gap-6">
+                        <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 shadow-sm flex-1">
+                          <h3 className="font-bold text-black dark:text-white mb-6 text-lg">{t("user_information")}</h3>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                            <div>
+                              <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                {t("first_name")} <span className="text-red-500">*</span>
                               </label>
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="status"
-                                  checked={status === "Inactive"}
-                                  onChange={() => setStatus("Inactive")}
-                                  className="w-4 h-4 text-gray-400 dark:text-[#a1a1aa] border-gray-300 dark:border-[#2A2F3A] focus:ring-gray-400"
-                                />
-                                <span className="text-[14px] text-green-700">Inactive</span>
-                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={firstName}
+                                onChange={(e) => setFirstName(e.target.value)}
+                                placeholder="ឈ្មោះពេញ"
+                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
+                              />
                             </div>
-                          </div>
-                          <div className="col-span-2 pt-4 mt-2 border-t border-gray-100 dark:border-[#2A2F3A]">
-                            <h3 className="font-bold text-black dark:text-white text-[15px] mb-4">Department & Role</h3>
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-                              <div>
-                                <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                                  Department <span className="text-red-500">*</span>
-                                </label>
-                                {mainRoles.length === 0 ? (
+                            <div>
+                              <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                {t("last_name")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={lastName}
+                                onChange={(e) => setLastName(e.target.value)}
+                                placeholder="Fullname"
+                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                {t("phone")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="tel"
+                                required
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                placeholder="Phone Number"
+                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                {t("email_contact")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="email"
+                                required
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Email"
+                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                {t("password")} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="password"
+                                required={!isEditMode}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Password"
+                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
+                              />
+                            </div>
+                            <div className="col-span-2 pt-2">
+                              <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
+                                Status
+                              </label>
+                              <div className="flex gap-6">
+                                <label className="flex items-center gap-2 cursor-pointer">
                                   <input
-                                    type="text"
-                                    required
-                                    value={selectedMainRole}
-                                    onChange={handleMainRoleChange}
-                                    placeholder="E.g. IT Center"
-                                    disabled={!isGlobalSuperAdmin}
-                                    className={`w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] ${!isGlobalSuperAdmin ? "opacity-70 cursor-not-allowed" : ""}`}
+                                    type="radio"
+                                    name="status"
+                                    checked={status === "Active"}
+                                    onChange={() => setStatus("Active")}
+                                    className="w-4 h-4 text-green-600 border-gray-300 dark:border-[#2A2F3A] focus:ring-green-500"
                                   />
-                                ) : (
-                                  <select
-                                    value={selectedMainRole}
-                                    onChange={handleMainRoleChange}
-                                    disabled={!isGlobalSuperAdmin}
-                                    className={`w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] ${!isGlobalSuperAdmin ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
-                                  >
-                                    {mainRoles.map((role, idx) => (
-                                      <option key={idx} value={role}>{role}</option>
-                                    ))}
-                                  </select>
-                                )}
-                              </div>
-                              <div>
-                                <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                                  Title <span className="text-red-500">*</span>
+                                  <span className="text-[14px] text-green-700">Active</span>
                                 </label>
-                                <select
-                                  value={selectedRole}
-                                  onChange={(e) => {
-                                    const newRole = e.target.value;
-                                    setSelectedRole(newRole);
-                                    const roleObj = dynamicRoles.find(r => r.title === newRole);
-                                    setSelectedType(roleObj?.type || "");
-                                  }}
-                                  disabled={!(isGlobalSuperAdmin || isDepartmentAdmin)}
-                                  className={`w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] ${!(isGlobalSuperAdmin || isDepartmentAdmin) ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
-                                >
-                                  {getAvailableRoles(selectedMainRole, selectedRole).map((roleName, idx) => (
-                                    <option key={idx} value={roleName}>{roleName}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                                  Role <span className="text-red-500">*</span>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name="status"
+                                    checked={status === "Inactive"}
+                                    onChange={() => setStatus("Inactive")}
+                                    className="w-4 h-4 text-gray-400 dark:text-[#a1a1aa] border-gray-300 dark:border-[#2A2F3A] focus:ring-gray-400"
+                                  />
+                                  <span className="text-[14px] text-green-700">Inactive</span>
                                 </label>
-                                <input
-                                  type="text"
-                                  value={selectedType}
-                                  readOnly
-                                  placeholder="Auto-filled from Title"
-                                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-100 dark:bg-[#161B22] cursor-not-allowed text-gray-500"
-                                />
+                              </div>
+                            </div>
+                            <div className="col-span-2 pt-4 mt-2 border-t border-gray-100 dark:border-[#2A2F3A]">
+                              <h3 className="font-bold text-black dark:text-white text-[15px] mb-4">Department & Role</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
+                                <div>
+                                  <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                    Department <span className="text-red-500">*</span>
+                                  </label>
+                                  {mainRoles.length === 0 ? (
+                                    <input
+                                      type="text"
+                                      required
+                                      value={selectedMainRole}
+                                      onChange={handleMainRoleChange}
+                                      placeholder="E.g. IT Center"
+                                      disabled={!isGlobalSuperAdmin}
+                                      className={`w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] ${!isGlobalSuperAdmin ? "opacity-70 cursor-not-allowed" : ""}`}
+                                    />
+                                  ) : (
+                                                                    <SearchableSelect
+                                      options={mainRoles}
+                                      value={selectedMainRole}
+                                      onChange={handleMainRoleChange}
+                                      disabled={!isGlobalSuperAdmin}
+                                      placeholder={t('search_department') || "Search department..."}
+                                      selectPlaceholder={t('select_department') || "Select department"}
+                                    />
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                    Type <span className="text-red-500">*</span>
+                                  </label>
+                                    <SearchableSelect
+                                      options={["Super Admin", "Admin", "Staff"]}
+                                      value={selectedType}
+                                      onChange={handleTypeChange}
+                                      disabled={!(isGlobalSuperAdmin || isDepartmentAdmin)}
+                                      placeholder={t('search_type') || "Search type..."}
+                                      selectPlaceholder={t('select_type') || "Select type"}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
+                                      Role <span className="text-red-500">*</span>
+                                    </label>
+                                    <SearchableSelect
+                                      options={getAvailableRoles(selectedMainRole, selectedType, selectedRole)}
+                                      value={selectedRole}
+                                      onChange={(e) => setSelectedRole(e.target.value)}
+                                      disabled={!(isGlobalSuperAdmin || isDepartmentAdmin) || getAvailableRoles(selectedMainRole, selectedType, selectedRole).length === 0}
+                                      placeholder={t('search_role') || "Search role..."}
+                                      selectPlaceholder={getAvailableRoles(selectedMainRole, selectedType, selectedRole).length === 0 ? "No data select" : (t('select_role') || "Select role")}
+                                    />
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
                     </div>
                     {/* Action Buttons */}
                     <div className="flex gap-3">
@@ -846,9 +843,9 @@ export default function AccountPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { 
-                          setViewState('LIST'); 
-                          resetForm(); 
+                        onClick={() => {
+                          setViewState('LIST');
+                          resetForm();
                         }}
                         className="px-8 py-2.5 bg-red-600 hover:bg-red-700 text-white text-[14px] font-bold rounded-md transition-colors"
                       >
@@ -894,7 +891,7 @@ export default function AccountPage() {
                           <span className="text-[15px] font-bold text-gray-800 dark:text-white mb-5">Profile Identity</span>
                           <div className="w-32 h-32 rounded-full border-4 border-white dark:border-[#2A2F3A] shadow-md flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-[#161B22] mb-6 relative ring-1 ring-gray-200 dark:ring-gray-700">
                             {selectedUserView.profilePhoto ? (
-                              <img src={selectedUserView.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                              <img src={selectedUserView.profilePhoto} alt="Profile" className="w-full h-full object-cover object-top" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-gray-400">
                                 <Users size={56} />
@@ -966,13 +963,12 @@ export default function AccountPage() {
                           <div className="text-[14px] font-bold text-black dark:text-white mb-1">Role</div>
                           <div className="text-[#1a5b28] text-[14px]">
                             {selectedUserView.type ? (
-                              <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-bold rounded-sm ${
-                                selectedUserView.type.toLowerCase().trim() === "super admin" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/30" :
-                                selectedUserView.type.toLowerCase().trim() === "admin" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30" :
-                                selectedUserView.type.toLowerCase().trim() === "head of unit" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30" :
-                                selectedUserView.type.toLowerCase().trim() === "staff" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/30" :
-                                "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-                              }`}>{selectedUserView.type}</span>
+                              <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-bold rounded-sm ${selectedUserView.type.toLowerCase().trim() === "super admin" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/30" :
+                                  selectedUserView.type.toLowerCase().trim() === "admin" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30" :
+                                    selectedUserView.type.toLowerCase().trim() === "head of unit" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30" :
+                                      selectedUserView.type.toLowerCase().trim() === "staff" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/30" :
+                                        "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                                }`}>{selectedUserView.type}</span>
                             ) : <span className="text-gray-400 italic text-[14px]">N/A</span>}
                           </div>
                         </div>
