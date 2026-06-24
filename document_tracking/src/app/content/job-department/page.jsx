@@ -1,26 +1,39 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { hasPermission } from "../../../utils/permissions";
 import DeleteConfirmationModal from "../../../components/DeleteConfirmationModal";
 import AlertModal from "../../../components/AlertModal";
-import { Search, Edit, Trash2, Eye, MoreVertical } from "lucide-react";
+import { CheckCircle2, ChevronRight, Eye, MoreVertical, Edit, Search, Trash2, X, Filter, FileText, UploadCloud, Plus, Calendar, Settings } from "lucide-react";
+import CustomSelect from "@/components/CustomSelect";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
 import BulkActionBar from "../../../components/BulkActionBar";
 import Pagination from "../../../components/Pagination";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function JobDepartmentPage() {
   const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const { t } = useLanguage();
 
   // Core State
   const [viewState, setViewState] = useState("LIST");
-  const [departments, setDepartments] = useState([]);
+  const queryClient = useQueryClient();
+
+  const { data: registeredUsers = [] } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: () => fetch('http://document_tracking_system.test/api/accounts').then(res => res.json())
+  });
+
+  const { data: departments = [], isLoading: isDepartmentsLoading } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => fetch('http://document_tracking_system.test/api/job-departments').then(res => res.json())
+  });
 
   // Table state
   const [selectedRows, setSelectedRows] = useState([]);
@@ -32,6 +45,7 @@ export default function JobDepartmentPage() {
   // Modals
   const [deleteModalConfig, setDeleteModalConfig] = useState({ isOpen: false, id: null, isBulk: false, title: "" });
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "" });
+  const [deleteRoleModalConfig, setDeleteRoleModalConfig] = useState({ isOpen: false, roleId: null, title: "" });
   const showAlert = (message) => setAlertModal({ isOpen: true, message });
 
   // Form State
@@ -49,11 +63,11 @@ export default function JobDepartmentPage() {
 
   // Roles State
   const [roleModalOpen, setRoleModalOpen] = useState(false);
-  const [roleFormData, setRoleFormData] = useState({ title: '', slug: '', level: '', type: '', coreFunction: '' });
+  const [roleFormData, setRoleFormData] = useState({ title: '', slug: '', level: '', type: 'Super Admin', coreFunction: '' });
   const [editingRoleId, setEditingRoleId] = useState(null);
   const [roleActionMenuOpen, setRoleActionMenuOpen] = useState(null);
   const [viewingRole, setViewingRole] = useState(false);
-  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [roleSearchTerm, setRoleSearchTerm] = useState("");
 
   useEffect(() => {
     const userStr = sessionStorage.getItem("currentUser");
@@ -62,35 +76,78 @@ export default function JobDepartmentPage() {
       return;
     }
     setCurrentUser(JSON.parse(userStr));
-
-    const storedUsers = localStorage.getItem("doc_tracking_users");
-    if (storedUsers) {
-      setRegisteredUsers(JSON.parse(storedUsers));
-    }
-
-    // Load stored departments
-    const stored = localStorage.getItem("doc_tracking_departments");
-    if (stored) {
-      setDepartments(JSON.parse(stored));
-    } else {
-      // Default departments
-      const defaultDepts = [
-        { id: "dept-1", title: "IT Center", code: "ITC", userSignature: "Var Sovanndara", description: "Information Technology Center", status: "Active" },
-        { id: "dept-2", title: "Office of Planning and Finance", code: "OPF", userSignature: "Sok Meng", description: "Finance and Planning", status: "Active" },
-        { id: "dept-3", title: "HR Department", code: "HRD", userSignature: "Linda Chan", description: "Human Resources", status: "Active" }
-      ];
-      setDepartments(defaultDepts);
-      localStorage.setItem("doc_tracking_departments", JSON.stringify(defaultDepts));
-    }
-
     setIsMounted(true);
-  }, [router]);
+  }, []);
+
+  const cancelCreate = () => {
+    setFormData({ title: "", code: "", campusSuite: "", userSignature: "", description: "", status: "Active" });
+    setIsEditMode(false);
+    setEditingId(null);
+    setViewState("LIST");
+    setRoleSearchTerm("");
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (params) => {
+      if (params.isBulk) {
+        for (const id of params.ids) {
+          await fetch(`http://document_tracking_system.test/api/job-departments/${id}`, { method: 'DELETE' });
+        }
+      } else {
+        await fetch(`http://document_tracking_system.test/api/job-departments/${params.id}`, { method: 'DELETE' });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      setSelectedRows([]);
+      setDeleteModalConfig({ isOpen: false, id: null, isBulk: false, title: "" });
+    },
+    onError: (err) => {
+      console.error(err);
+      showAlert("Error deleting department");
+    }
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (deptData) => {
+      const url = isEditMode 
+        ? `http://document_tracking_system.test/api/job-departments/${editingId}`
+        : 'http://document_tracking_system.test/api/job-departments';
+      const res = await fetch(url, {
+        method: isEditMode ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(deptData)
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      cancelCreate();
+    },
+    onError: (err) => {
+      console.error(err);
+      showAlert("Error saving department");
+    }
+  });
 
   if (!isMounted) return null;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === "title") {
+        // Auto-generate code based on initials of the title
+        updated.code = value
+          .split(/[\s-]+/)
+          .filter(word => word.length > 0)
+          .map(word => word[0].toUpperCase())
+          .join('')
+          .substring(0, 5);
+      }
+      return updated;
+    });
   };
 
   const handleViewClick = (dept) => {
@@ -127,18 +184,7 @@ export default function JobDepartmentPage() {
   };
 
   const confirmDelete = () => {
-    if (deleteModalConfig.isBulk) {
-      const updatedList = departments.filter(d => !selectedRows.includes(d.id));
-      setDepartments(updatedList);
-      localStorage.setItem("doc_tracking_departments", JSON.stringify(updatedList));
-      setSelectedRows([]);
-    } else {
-      const updatedList = departments.filter(d => d.id !== deleteModalConfig.id);
-      setDepartments(updatedList);
-      localStorage.setItem("doc_tracking_departments", JSON.stringify(updatedList));
-      setSelectedRows(prev => prev.filter(rowId => rowId !== deleteModalConfig.id));
-    }
-    setDeleteModalConfig({ isOpen: false, id: null, isBulk: false, title: "" });
+    deleteMutation.mutate({ isBulk: deleteModalConfig.isBulk, id: deleteModalConfig.id, ids: selectedRows });
   };
 
   // Role Management Functions
@@ -155,7 +201,7 @@ export default function JobDepartmentPage() {
   };
 
   const openNewRoleModal = () => {
-    setRoleFormData({ title: '', slug: '', level: '', type: '', coreFunction: '' });
+    setRoleFormData({ title: '', slug: '', level: '', type: 'Super Admin', coreFunction: '' });
     setEditingRoleId(null);
     setViewingRole(false);
     setRoleModalOpen(true);
@@ -190,61 +236,20 @@ export default function JobDepartmentPage() {
     }
 
     setFormData(prev => ({ ...prev, roles: updatedRoles }));
-
-    if (editingId) {
-      const updatedDepartments = departments.map(d =>
-        d.id === editingId ? { ...d, roles: updatedRoles } : d
-      );
-      setDepartments(updatedDepartments);
-      localStorage.setItem("doc_tracking_departments", JSON.stringify(updatedDepartments));
-    }
-
     setRoleModalOpen(false);
   };
 
   const deleteRole = (roleId) => {
     const updatedRoles = (formData.roles || []).filter(r => r.id !== roleId);
     setFormData(prev => ({ ...prev, roles: updatedRoles }));
-
-    if (editingId) {
-      const updatedDepartments = departments.map(d =>
-        d.id === editingId ? { ...d, roles: updatedRoles } : d
-      );
-      setDepartments(updatedDepartments);
-      localStorage.setItem("doc_tracking_departments", JSON.stringify(updatedDepartments));
-    }
   };
 
   const saveDepartment = () => {
-    if (!formData.title || !formData.userSignature) {
-      showAlert(t("Please fill in Department Name and User Signature"));
+    if (!formData.title) {
+      showAlert(t("Please fill in Department Name"));
       return;
     }
-
-    let updatedList;
-    if (isEditMode) {
-      updatedList = departments.map(d =>
-        d.id === editingId ? { ...d, ...formData } : d
-      );
-    } else {
-      const newDept = {
-        id: "dept-" + Date.now(),
-        ...formData
-      };
-      updatedList = [...departments, newDept];
-    }
-
-    setDepartments(updatedList);
-    localStorage.setItem("doc_tracking_departments", JSON.stringify(updatedList));
-
-    cancelCreate();
-  };
-
-  const cancelCreate = () => {
-    setFormData({ title: "", code: "", campusSuite: "", userSignature: "", description: "", status: "Active" });
-    setIsEditMode(false);
-    setEditingId(null);
-    setViewState("LIST");
+    saveMutation.mutate(formData);
   };
 
   const handleSelectAll = () => {
@@ -264,8 +269,10 @@ export default function JobDepartmentPage() {
   const toggleRowSelection = (id) => {
     setSelectedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
   };
-
+  
+  if (!isMounted) return null;
   const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
+  const hasAccess = hasPermission(currentUser, "Job Department", "View");
   const userDept = (currentUser?.mainRole || currentUser?.department || "").toLowerCase().trim();
 
   const filteredData = departments.filter(dept => {
@@ -275,11 +282,19 @@ export default function JobDepartmentPage() {
     }
     const searchLower = searchTerm.toLowerCase();
     return (dept.title || "").toLowerCase().includes(searchLower) ||
-           (dept.userSignature || "").toLowerCase().includes(searchLower);
+      (dept.userSignature || "").toLowerCase().includes(searchLower);
   });
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const filteredRoles = (formData.roles || []).filter(role => {
+    const searchLower = roleSearchTerm.toLowerCase();
+    return (role.title || "").toLowerCase().includes(searchLower) ||
+      (role.slug || "").toLowerCase().includes(searchLower) ||
+      (role.type || "").toLowerCase().includes(searchLower) ||
+      (role.coreFunction || "").toLowerCase().includes(searchLower);
+  });
 
   return (
     <div className="flex bg-[#fdfdfd] dark:bg-[#0F1117] min-h-screen font-sans">
@@ -305,7 +320,7 @@ export default function JobDepartmentPage() {
                   )}
                 </div>
 
-                <div className="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-[#2A2F3A] flex flex-col overflow-hidden">
+                <div className="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-[#2A2F3A] flex flex-col overflow-hidden md:overflow-visible">
                   <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100 dark:border-[#2A2F3A]">
                     <div className="w-full md:w-auto">
                       <BulkActionBar
@@ -328,9 +343,9 @@ export default function JobDepartmentPage() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto md:overflow-visible">
                     <table className="w-full text-left text-[14px]">
-                      <thead className="bg-[#f5f5f5] dark:bg-[#242B36] text-black dark:text-white font-bold">
+                      <thead className="bg-[#f5f5f5] dark:bg-[#242B36] text-black dark:text-white font-bold text-[15px]">
                         <tr className="border-b border-gray-200 dark:border-[#2A2F3A]">
                           <th className="py-3 px-4 w-12 text-center cursor-pointer" onClick={() => selectedRows.length === paginatedData.length && paginatedData.length > 0 ? handleDeselectAll() : handleSelectAll()}>
                             <div className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors mx-auto ${selectedRows.length === paginatedData.length && paginatedData.length > 0 ? 'bg-[#1a5b28] border-[#1a5b28]' : 'bg-white dark:bg-[#161B22] border-gray-400'}`}>
@@ -339,30 +354,32 @@ export default function JobDepartmentPage() {
                           </th>
                           <th className="py-3 px-4">{t("code") || "Code"}</th>
                           <th className="py-3 px-4">{t("title") || "Title"}</th>
-                          <th className="py-3 px-4">{t("signature_by") || "User Sign"}</th>
+                          <th className="py-3 px-4">{t("user_signature") || "User Signature"}</th>
                           <th className="py-3 px-4">{t("status") || "Status"}</th>
                           <th className="py-3 px-4 w-24"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A] text-gray-700 dark:text-white">
-                        {paginatedData.map((dept) => {
+                        {paginatedData.map((dept, idx) => {
                           const isSelected = selectedRows.includes(dept.id);
                           return (
                             <tr key={dept.id} className={`hover:bg-gray-50/50 dark:hover:bg-[#242B36] transition-colors ${isSelected ? 'bg-green-50/30' : ''}`}>
-                              <td className={`py-3 px-4 text-center cursor-pointer ${isSelected ? 'border-l-4 border-l-[#1a5b28]' : 'border-l-4 border-l-transparent'}`} onClick={() => toggleRowSelection(dept.id)}>
+                              <td className={`text-[14px] py-3 px-4 text-center cursor-pointer ${isSelected ? 'border-l-4 border-l-[#1a5b28]' : 'border-l-4 border-l-transparent'}`} onClick={() => toggleRowSelection(dept.id)}>
                                 <div className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors mx-auto ${isSelected ? 'bg-[#1a5b28] border-[#1a5b28]' : 'bg-white dark:bg-[#161B22] border-gray-400'}`}>
                                   {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
                                 </div>
                               </td>
-                              <td className="py-4 px-4 text-gray-800 dark:text-gray-200">{dept.code}</td>
-                              <td className="py-4 px-4 text-gray-800 dark:text-gray-200">{dept.title}</td>
-                              <td className="py-4 px-4 text-gray-800 dark:text-gray-200">{dept.userSignature}</td>
-                              <td className="py-4 px-4">
+                              <td className="text-[14px] py-4 px-4 text-gray-800 dark:text-gray-200">{dept.code}</td>
+                              <td className="text-[14px] py-4 px-4 text-gray-800 dark:text-gray-200">{dept.title}</td>
+                              <td className="text-[14px] py-4 px-4 text-gray-800 dark:text-gray-200">
+                                {dept.userSignature ? dept.userSignature.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim() : ''}
+                              </td>
+                              <td className="text-[14px] py-4 px-4">
                                 <span className={`inline-flex items-center justify-center px-3 py-1 text-[11px] font-bold rounded-sm ${dept.status === 'Active' ? 'bg-[#8ee093] text-[#0c4015]' : 'bg-gray-300 text-gray-700'}`}>
                                   {dept.status === 'Active' ? t("active") || "Active" : t("inactive") || "Inactive"}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 relative">
+                              <td className={`py-3 px-4 relative ${actionMenuOpen === dept.id ? 'z-30' : ''}`}>
                                 <div className="flex justify-end relative">
                                   <button
                                     onClick={() => setActionMenuOpen(actionMenuOpen === dept.id ? null : dept.id)}
@@ -373,7 +390,8 @@ export default function JobDepartmentPage() {
                                   {actionMenuOpen === dept.id && (
                                     <>
                                       <div className="fixed inset-0 z-40" onClick={() => setActionMenuOpen(null)} />
-                                      <div className="absolute top-full right-0 mt-1 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                      <div className={`absolute right-0 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1 ${(idx === paginatedData.length - 1 || (idx === paginatedData.length - 2 && paginatedData.length >= 3)) ? 'bottom-full mb-1' : 'top-full mt-1'
+                                        }`}>
                                         {hasPermission(currentUser, "Job Department", "View") && (
                                           <button
                                             onClick={() => { setActionMenuOpen(null); handleViewClick(dept); }}
@@ -436,7 +454,7 @@ export default function JobDepartmentPage() {
                   </h1>
                   <button
                     onClick={cancelCreate}
-                    className="px-6 py-2 bg-gray-400 hover:bg-gray-500 text-white text-[14px] font-medium rounded-md transition-colors capitalize"
+                    className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white text-[14px] font-medium rounded-md transition-colors capitalize"
                   >
                     {t("back") || "Back"}
                   </button>
@@ -461,9 +479,9 @@ export default function JobDepartmentPage() {
                                 type="text"
                                 name="code"
                                 value={formData.code}
-                                onChange={handleInputChange}
-                                placeholder="Enter code..."
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] text-black dark:text-white"
+                                readOnly
+                                placeholder="Auto-generated..."
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] outline-none text-[14px] bg-gray-100 dark:bg-[#1E232B] text-gray-500 dark:text-gray-400 cursor-not-allowed"
                               />
                             </div>
                           </div>
@@ -574,7 +592,7 @@ export default function JobDepartmentPage() {
 
                   {/* Right Column: User Signature Assigned */}
                   <div className="w-full lg:w-[35%]">
-                    <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg overflow-hidden shadow-sm flex flex-col">
+                    <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-sm flex flex-col">
                       <div className="p-4 border-b border-gray-200 dark:border-[#2A2F3A]">
                         <h2 className="text-[16px] font-bold text-black dark:text-white">User Signature Assigned</h2>
                       </div>
@@ -583,20 +601,25 @@ export default function JobDepartmentPage() {
                           User Signature
                         </label>
                         <div className="relative">
-                          <select
+                          <CustomSelect
                             name="userSignature"
                             value={formData.userSignature}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] text-gray-700 dark:text-white appearance-none cursor-pointer"
-                          >
-                            <option value="" disabled>Select User</option>
-                            <option value="Var Sovanndara">Var Sovanndara</option>
-                            <option value="Sok Meng">Sok Meng</option>
-                            <option value="Linda Chan">Linda Chan</option>
-                          </select>
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-                          </div>
+                            placeholder="Select User"
+                            searchable={true}
+                            searchPlaceholder="Search user..."
+                            options={registeredUsers
+                              .filter(u => {
+                                const currentDept = (formData.title || formData.code || "").toLowerCase().trim();
+                                if (!currentDept) return true; // If no department title yet, show all
+                                const uDept = (u.department || u.mainRole || "it center").toLowerCase().trim();
+                                return uDept === currentDept;
+                              })
+                              .map(u => {
+                                const rawName = (u.fullname_en || u.fullname_kh || u.username || u.email).trim();
+                                return { label: rawName, value: rawName };
+                              })}
+                          />
                         </div>
                         <p className="mt-4 text-[13px] text-gray-500">
                           <span className="text-[#eab308] font-medium">Warning :</span> This User only that can sign after finished or approved final step.
@@ -606,6 +629,124 @@ export default function JobDepartmentPage() {
                   </div>
 
                 </div>
+
+                {/* Bottom Roles Table */}
+                <div className="bg-[#f5f5f5] dark:bg-[#161B22] rounded-lg overflow-hidden md:overflow-visible shadow-sm p-6 mb-8 mt-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-black dark:text-white">Role in {formData.title || "Department"}</h3>
+                    </div>
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                      <div className="relative flex-1 md:flex-initial">
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search..."
+                          value={roleSearchTerm}
+                          onChange={(e) => setRoleSearchTerm(e.target.value)}
+                          className="w-full md:w-64 pl-9 pr-4 py-2 rounded-lg border border-gray-300 dark:border-[#2A2F3A] outline-none text-[14px] bg-white dark:bg-[#242B36] text-black dark:text-white"
+                        />
+                      </div>
+                      <button
+                        onClick={openNewRoleModal}
+                        className="px-4 py-2 bg-[#125821] hover:bg-[#0c4015] text-white text-[14px] font-bold rounded-md flex items-center gap-1 shrink-0"
+                      >
+                        <span className="text-lg leading-none">+</span> New Role
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto md:overflow-visible bg-white dark:bg-[#161B22] rounded-lg border border-gray-200 dark:border-[#2A2F3A]">
+                    <table className="w-full text-left text-[14px]">
+                      <thead className="bg-[#ececec] dark:bg-[#242B36] text-black dark:text-white font-bold">
+                        <tr>
+                          <th className="py-4 px-4 w-12 text-center border-b border-gray-200 dark:border-[#2A2F3A]">
+                            <div className="w-4 h-4 border border-gray-500 bg-white rounded-sm mx-auto"></div>
+                          </th>
+                          <th className="py-4 px-4 text-[16px] border-b border-gray-200 dark:border-[#2A2F3A]">Title</th>
+                          <th className="py-4 px-4 text-[16px] border-b border-gray-200 dark:border-[#2A2F3A]">Slug</th>
+                          <th className="py-4 px-4 text-[16px] border-b border-gray-200 dark:border-[#2A2F3A]">Level</th>
+                          <th className="py-4 px-4 text-[16px] border-b border-gray-200 dark:border-[#2A2F3A]">Type</th>
+                          <th className="py-4 px-4 text-[16px] border-b border-gray-200 dark:border-[#2A2F3A]">Core Function</th>
+                          <th className="py-4 px-4 w-32 border-b border-gray-200 dark:border-[#2A2F3A]"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A]">
+                        {filteredRoles && filteredRoles.length > 0 ? (
+                          filteredRoles.map((role, idx) => (
+                            <tr key={role.id || idx} className="hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors bg-white dark:bg-[#161B22]">
+                              <td className="py-4 px-4 text-center">
+                                <div className="w-4 h-4 border border-gray-500 bg-white rounded-sm mx-auto"></div>
+                              </td>
+                              <td className="py-4 px-4 text-[16px] text-gray-700 dark:text-gray-300">{role.title}</td>
+                              <td className="py-4 px-4 text-[16px] text-gray-700 dark:text-gray-300">{role.slug}</td>
+                              <td className="py-4 px-4">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-sm bg-[#8ee093] text-white font-bold text-[12px]">
+                                  {role.level}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className={`inline-flex items-center justify-center px-3 py-1 text-[12px] font-bold rounded-sm ${(role.type || '').toLowerCase().includes('super') ? 'bg-green-100 text-green-700' :
+                                  (role.type || '').toLowerCase().includes('admin') ? 'bg-pink-100 text-pink-700' :
+                                    (role.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
+                                      'bg-gray-100 text-gray-700'
+                                  }`}>
+                                  {role.type || 'N/A'}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-[15px] text-gray-600 dark:text-gray-400 max-w-sm">
+                                {role.coreFunction}
+                              </td>
+                              <td className={`py-4 px-4 relative ${roleActionMenuOpen === role.id ? 'z-30' : ''}`}>
+                                <div className="flex justify-end relative">
+                                  <button
+                                    onClick={() => setRoleActionMenuOpen(roleActionMenuOpen === role.id ? null : role.id)}
+                                    className="px-3 py-1.5 bg-[#125821] hover:bg-[#0c4015] text-white text-[13px] font-medium rounded-md flex items-center gap-1 w-full justify-center"
+                                  >
+                                    ⋮ Action
+                                  </button>
+                                  {roleActionMenuOpen === role.id && (
+                                    <>
+                                      <div className="fixed inset-0 z-40" onClick={() => setRoleActionMenuOpen(null)} />
+                                      <div className={`absolute right-0 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1 ${(idx === filteredRoles.length - 1 || (idx === filteredRoles.length - 2 && filteredRoles.length >= 3)) ? 'bottom-full mb-1' : 'top-full mt-1'
+                                        }`}>
+                                        <button
+                                          onClick={() => { setRoleActionMenuOpen(null); openViewRoleModal(role); }}
+                                          className="w-full text-left px-4 py-2 text-[13px] text-[#1a5b28] hover:bg-green-50 flex items-center gap-2 transition-colors"
+                                        >
+                                          <Eye size={14} /> View
+                                        </button>
+                                        <button
+                                          onClick={() => { setRoleActionMenuOpen(null); openEditRoleModal(role); }}
+                                          className="w-full text-left px-4 py-2 text-[13px] text-[#dcb23c] hover:bg-[#fff9e6] flex items-center gap-2 transition-colors"
+                                        >
+                                          <Edit size={14} /> Edit
+                                        </button>
+                                        <button
+                                          onClick={() => { setRoleActionMenuOpen(null); deleteRole(role.id); }}
+                                          className="w-full text-left px-4 py-2 text-[13px] text-red-655 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                        >
+                                          <Trash2 size={14} /> Delete
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="7" className="py-8 text-center text-gray-500">
+                              No roles have been added yet. Click "+ New Role" to create one.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
             )}
 
@@ -624,7 +765,7 @@ export default function JobDepartmentPage() {
                     </button>
                     <button
                       onClick={cancelCreate}
-                      className="px-8 py-2 bg-gray-400 hover:bg-gray-500 text-white text-[14px] font-bold rounded-md transition-colors capitalize"
+                      className="px-8 py-2 bg-gray-500 hover:bg-gray-600 text-white text-[14px] font-bold rounded-md transition-colors capitalize"
                     >
                       {t("back") || "Back"}
                     </button>
@@ -676,7 +817,7 @@ export default function JobDepartmentPage() {
                       <div className="p-6 flex flex-col gap-5">
                         {(() => {
                           const assignedUser = registeredUsers.find(
-                            u => `${u.firstName || ''} ${u.lastName || ''}`.trim() === formData.userSignature ||
+                            u => (u.fullname_en || u.fullname_kh || u.username || u.email).trim() === formData.userSignature ||
                               u.username === formData.userSignature ||
                               u.email === formData.userSignature
                           ) || (currentUser?.username === formData.userSignature ? currentUser : null);
@@ -689,7 +830,9 @@ export default function JobDepartmentPage() {
                               <div className="flex">
                                 <span className="font-bold text-[14px] text-black dark:text-white w-16">Name</span>
                                 <span className="font-bold text-[14px] text-black dark:text-white mr-2">:</span>
-                                <span className="text-[#1a5b28] text-[14px]">{formData.userSignature || "-"}</span>
+                                <span className="text-[#1a5b28] text-[14px]">
+                                  {formData.userSignature ? formData.userSignature.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim() : "-"}
+                                </span>
                               </div>
                               <div className="flex">
                                 <span className="font-bold text-[14px] text-black dark:text-white w-16">Email</span>
@@ -710,7 +853,7 @@ export default function JobDepartmentPage() {
                 </div>
 
                 {/* Bottom Roles Table */}
-                <div className="bg-[#f5f5f5] dark:bg-[#161B22] rounded-lg overflow-hidden shadow-sm p-6 mb-8">
+                <div className="bg-[#f5f5f5] dark:bg-[#161B22] rounded-lg overflow-hidden md:overflow-visible shadow-sm p-6 mb-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div>
                       <h3 className="text-lg font-bold text-black dark:text-white">Role in {formData.title || "Department"}</h3>
@@ -721,6 +864,8 @@ export default function JobDepartmentPage() {
                         <input
                           type="text"
                           placeholder="Search..."
+                          value={roleSearchTerm}
+                          onChange={(e) => setRoleSearchTerm(e.target.value)}
                           className="w-full md:w-64 pl-9 pr-4 py-2 rounded-lg border border-gray-300 dark:border-[#2A2F3A] outline-none text-[14px] bg-white dark:bg-[#242B36] text-black dark:text-white"
                         />
                       </div>
@@ -733,7 +878,7 @@ export default function JobDepartmentPage() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto bg-white dark:bg-[#161B22] rounded-lg border border-gray-200 dark:border-[#2A2F3A]">
+                  <div className="overflow-x-auto md:overflow-visible bg-white dark:bg-[#161B22] rounded-lg border border-gray-200 dark:border-[#2A2F3A]">
                     <table className="w-full text-left text-[14px]">
                       <thead className="bg-[#ececec] dark:bg-[#242B36] text-black dark:text-white font-bold">
                         <tr>
@@ -749,8 +894,8 @@ export default function JobDepartmentPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A]">
-                        {formData.roles && formData.roles.length > 0 ? (
-                          formData.roles.map((role, idx) => (
+                        {filteredRoles && filteredRoles.length > 0 ? (
+                          filteredRoles.map((role, idx) => (
                             <tr key={role.id || idx} className="hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors bg-white dark:bg-[#161B22]">
                               <td className="py-4 px-4 text-center">
                                 <div className="w-4 h-4 border border-gray-500 bg-white rounded-sm mx-auto"></div>
@@ -764,17 +909,17 @@ export default function JobDepartmentPage() {
                               </td>
                               <td className="py-4 px-4">
                                 <span className={`inline-flex items-center justify-center px-3 py-1 text-[12px] font-bold rounded-sm ${(role.type || '').toLowerCase().includes('super') ? 'bg-green-100 text-green-700' :
-                                    (role.type || '').toLowerCase().includes('admin') ? 'bg-pink-100 text-pink-700' :
-                                      (role.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
-                                        'bg-gray-100 text-gray-700'
+                                  (role.type || '').toLowerCase().includes('admin') ? 'bg-pink-100 text-pink-700' :
+                                    (role.type || '').toLowerCase().includes('staff') ? 'bg-blue-100 text-blue-700' :
+                                      'bg-gray-100 text-gray-700'
                                   }`}>
                                   {role.type || 'N/A'}
                                 </span>
                               </td>
-                              <td className="py-4 px-4 text-[11px] text-gray-600 dark:text-gray-400 max-w-sm">
+                              <td className="py-4 px-4 text-[15px] text-gray-600 dark:text-gray-400 max-w-sm">
                                 {role.coreFunction}
                               </td>
-                              <td className="py-4 px-4 relative">
+                              <td className={`py-4 px-4 relative ${roleActionMenuOpen === role.id ? 'z-30' : ''}`}>
                                 <div className="flex justify-end relative">
                                   <button
                                     onClick={() => setRoleActionMenuOpen(roleActionMenuOpen === role.id ? null : role.id)}
@@ -785,7 +930,8 @@ export default function JobDepartmentPage() {
                                   {roleActionMenuOpen === role.id && (
                                     <>
                                       <div className="fixed inset-0 z-40" onClick={() => setRoleActionMenuOpen(null)} />
-                                      <div className="absolute top-full right-0 mt-1 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                      <div className={`absolute right-0 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1 ${(idx === filteredRoles.length - 1 || (idx === filteredRoles.length - 2 && filteredRoles.length >= 3)) ? 'bottom-full mb-1' : 'top-full mt-1'
+                                        }`}>
                                         <button
                                           onClick={() => { setRoleActionMenuOpen(null); openViewRoleModal(role); }}
                                           className="w-full text-left px-4 py-2 text-[13px] text-[#1a5b28] hover:bg-green-50 flex items-center gap-2 transition-colors"
@@ -799,8 +945,8 @@ export default function JobDepartmentPage() {
                                           <Edit size={14} /> Edit
                                         </button>
                                         <button
-                                          onClick={() => { setRoleActionMenuOpen(null); deleteRole(role.id); }}
-                                          className="w-full text-left px-4 py-2 text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                          onClick={() => { setRoleActionMenuOpen(null); setDeleteRoleModalConfig({ isOpen: true, roleId: role.id, title: role.title }); }}
+                                          className="w-full text-left px-4 py-2 text-[13px] text-red-650 hover:bg-red-50 flex items-center gap-2 transition-colors"
                                         >
                                           <Trash2 size={14} /> Delete
                                         </button>
@@ -913,20 +1059,23 @@ export default function JobDepartmentPage() {
                   <label className="block text-[16px] font-bold text-black dark:text-white mb-2">
                     Type
                   </label>
-                  <input
-                    type="text"
+                  <CustomSelect
                     name="type"
                     value={roleFormData.type}
                     onChange={handleRoleInputChange}
                     disabled={viewingRole}
-                    placeholder="Super admin, admin, staff..."
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] text-black dark:text-white disabled:opacity-70"
+                    placeholder={t("select_type") || "Select type..."}
+                    options={[
+                      { label: "Super Admin", value: "Super Admin" },
+                      { label: "Admin", value: "Admin" },
+                      { label: "Staff", value: "Staff" }
+                    ]}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[16px] font-bold text-black dark:text-white mb-2">
+                <label className="block text-[14px] font-bold text-black dark:text-white mb-2">
                   Core Function
                 </label>
                 <textarea
@@ -945,11 +1094,36 @@ export default function JobDepartmentPage() {
       )}
 
       <DeleteConfirmationModal
+        isOpen={deleteRoleModalConfig.isOpen}
+        onClose={() => setDeleteRoleModalConfig({ isOpen: false, roleId: null, title: "" })}
+        onConfirm={() => {
+          deleteRole(deleteRoleModalConfig.roleId);
+          setDeleteRoleModalConfig({ isOpen: false, roleId: null, title: "" });
+        }}
+        itemCount={1}
+        itemName={deleteRoleModalConfig.title || ""}
+        itemType="roles"
+      />
+
+      <DeleteConfirmationModal
         isOpen={deleteModalConfig.isOpen}
         onClose={() => setDeleteModalConfig({ isOpen: false, id: null, isBulk: false, title: "" })}
         onConfirm={confirmDelete}
         itemCount={deleteModalConfig.isBulk ? selectedRows.length : 1}
-        itemName={deleteModalConfig.title || ""}
+        itemName={(() => {
+          const targetId = (!deleteModalConfig.isBulk && deleteModalConfig.id) 
+            ? deleteModalConfig.id 
+            : (deleteModalConfig.isBulk && selectedRows.length === 1) 
+              ? selectedRows[0] 
+              : null;
+              
+          if (!targetId) return "";
+          
+          if (!deleteModalConfig.isBulk) return deleteModalConfig.title;
+          
+          const targetDept = departments.find(d => d.id === targetId);
+          return targetDept?.title;
+        })()}
         itemType="departments"
       />
 

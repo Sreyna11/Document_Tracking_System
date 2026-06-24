@@ -1,15 +1,36 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { Bell, Inbox, FileText, Calendar, CheckCircle2, X, AlertCircle, ImageIcon, MoreVertical, Paperclip } from "lucide-react";
 import AlertModal from "../../../components/AlertModal";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
+
+const getEnglishName = (name) => {
+  if (!name) return "";
+  return name.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim();
+};
+
+const getLocalizedName = (name, language) => {
+  if (!name) return "";
+  if (language === 'km') {
+    const khmerPart = name.match(/[\u1780-\u17FF\u19E0-\u19FF]+/g);
+    if (khmerPart && khmerPart.length > 0) {
+      return khmerPart.join(' ').trim();
+    }
+    return name.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim() || name;
+  } else {
+    const enPart = name.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim();
+    return enPart || name;
+  }
+};
+
 export default function NotificationPage() {
   const router = useRouter();
-  const { t } = useLanguage();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { t, language } = useLanguage();
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -40,13 +61,13 @@ export default function NotificationPage() {
     } catch (e) {
       console.error(e);
     }
-  }, [router]);
+  }, []);
   useEffect(() => {
     if (!currentUser) return;
     const loadNotifications = (storageData) => {
       try {
         let allNotifs = storageData ? JSON.parse(storageData) : [];
-        const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+        const userDept = (currentUser.department || currentUser.mainRole || "").toLowerCase().trim();
         let myNotifs = allNotifs.filter(n => {
           if (userDept === "global") return true;
           const target = (n.targetDepartment || "").toLowerCase().trim();
@@ -82,10 +103,16 @@ export default function NotificationPage() {
     };
   }, [currentUser]);
   const getSenderPhoto = (senderName) => {
-    if (!senderName) return null;
+    if (!senderName || users.length === 0) return null;
+    const sName = getEnglishName(senderName).toLowerCase().trim();
     const match = users.find(
-      (u) => (`${u.firstName} ${u.lastName}`).toLowerCase().trim() === senderName.toLowerCase().trim() ||
-        (u.username || "").toLowerCase().trim() === senderName.toLowerCase().trim()
+      (u) => {
+        const uFirstLast = getEnglishName(`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim();
+        const uUser = getEnglishName(u.username || "").toLowerCase().trim();
+        return uFirstLast === sName || uUser === sName || 
+               (`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim() === senderName.toLowerCase().trim() ||
+               (u.username || "").toLowerCase().trim() === senderName.toLowerCase().trim();
+      }
     );
     return match ? match.profilePhoto : null;
   };
@@ -105,7 +132,7 @@ export default function NotificationPage() {
     try {
       const storedNotifs = localStorage.getItem("doc_tracking_notifications");
       let allNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
-      const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+      const userDept = (currentUser.department || currentUser.mainRole || "").toLowerCase().trim();
       const updated = allNotifs.map(n => {
         const target = (n.targetDepartment || "").toLowerCase().trim();
         const matches = target === userDept ||
@@ -183,15 +210,15 @@ export default function NotificationPage() {
           currentUser={currentUser}
         />
         <div className="p-8 md:p-10 flex-1 w-full mx-auto">
-          <div className="bg-white border border-gray-100 rounded-xl min-h-[calc(100vh-140px)] p-6 md:p-8 shadow-sm flex flex-col select-none animate-fade-in">
+          <div className="bg-white dark:bg-[#161B22] border border-gray-100 dark:border-[#2A2F3A] rounded-xl min-h-[calc(100vh-140px)] p-6 md:p-8 shadow-sm flex flex-col select-none animate-fade-in">
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-4 border-b border-gray-100 mb-6 gap-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-4 border-b border-gray-100 dark:border-[#2A2F3A] mb-6 gap-4">
               <div>
-                <h1 className="text-[28px] font-bold text-[#0c3f0d] tracking-tight flex items-center gap-3">
-                  <Bell className="text-green-600" size={28} />
+                <h1 className="text-[28px] font-bold text-[#0c3f0d] dark:text-white tracking-tight flex items-center gap-3">
+                  <Bell className="text-green-600 dark:text-[#4ade80]" size={28} />
                   {t('notifications')}
                 </h1>
-                <p className="text-gray-500 text-[13px] font-medium mt-1">
+                <p className="text-gray-500 dark:text-gray-400 text-[13px] font-medium mt-1">
                   {t('notifications_desc')}
                 </p>
               </div>
@@ -200,7 +227,7 @@ export default function NotificationPage() {
                   <button
                     onClick={markAllAsRead}
                     disabled={unreadCount === 0}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 dark:bg-[#161616] disabled:text-gray-400 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-98"
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-[#2A2F3A] dark:hover:bg-[#323842] disabled:bg-gray-50 dark:disabled:bg-[#161B22] text-gray-700 dark:text-gray-300 disabled:text-gray-400 dark:disabled:text-gray-600 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap active:scale-98"
                   >
                     {t('mark_all_as_read')}
                   </button>
@@ -209,18 +236,18 @@ export default function NotificationPage() {
             </div>
             {/* Quick Stats */}
             <div className="flex gap-4 mb-6">
-              <div className="px-4 py-2 bg-red-50 text-red-700 rounded-xl border border-red-100 text-xs font-bold shadow-2xs">
+              <div className="px-4 py-2 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 rounded-xl border border-red-100 dark:border-red-500/20 text-xs font-bold shadow-2xs">
                 {unreadCount} {t('unread')}
               </div>
             </div>
             {/* List */}
             {notifications.length === 0 ? (
               <div className="py-20 flex flex-col items-center justify-center text-center flex-1">
-                <div className="w-16 h-16 bg-gray-50 dark:bg-[#161616] border border-gray-100 text-gray-400 rounded-full flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-gray-50 dark:bg-[#0B0D12] border border-gray-100 dark:border-[#2A2F3A] text-gray-400 dark:text-[#a1a1aa] rounded-full flex items-center justify-center mb-4">
                   <Inbox size={26} className="stroke-[1.5]" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-1">{t('no_notifications_yet')}</h3>
-                <p className="text-gray-500 text-sm font-medium text-center max-w-sm">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-1">{t('no_notifications_yet')}</h3>
+                <p className="text-gray-500 dark:text-gray-450 text-sm font-medium text-center max-w-sm">
                   {t('no_notifications_desc')}
                 </p>
               </div>
@@ -233,7 +260,7 @@ export default function NotificationPage() {
                       if (!notif.read) markAsRead(notif.id);
                       if (notif.requestId) router.push(`/content/receive?id=${notif.requestId}`);
                     }}
-                    className={`bg-white border rounded-2xl p-5 flex items-start md:items-center justify-between shadow-xs transition-all duration-300 gap-4 cursor-pointer hover:shadow-md ${!notif.read ? "border-l-4 border-l-green-500 border-gray-200 bg-green-50/30" : "border-gray-100 hover:border-green-600/30"
+                    className={`bg-white dark:bg-[#0B0D12] border rounded-2xl p-5 flex items-start md:items-center justify-between shadow-xs transition-all duration-300 gap-4 cursor-pointer hover:shadow-md ${!notif.read ? "border-l-4 border-l-green-500 border-gray-200 dark:border-gray-700 dark:border-l-green-500 bg-green-50/30 dark:bg-green-500/5" : "border-gray-100 dark:border-[#2A2F3A] hover:border-green-600/30 dark:hover:border-green-500/30"
                       }`}
                   >
                     <div className="flex flex-col md:flex-row md:items-center gap-5 flex-1 min-w-0">
@@ -243,35 +270,34 @@ export default function NotificationPage() {
                           <img
                             src={getSenderPhoto(notif.senderName)}
                             alt={notif.senderName}
-                            className="w-14 h-14 rounded-full object-cover border border-gray-200 shadow-2xs"
+                            className="w-14 h-14 rounded-full object-cover object-top border border-gray-200 dark:border-[#2A2F3A] shadow-2xs"
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-full border border-gray-200 shadow-2xs flex-shrink-0 flex items-center justify-center bg-gray-100 overflow-hidden text-gray-500 font-bold text-xl uppercase">
-                            {notif.senderName ? notif.senderName.charAt(0) : "U"}
+                          <div className="w-14 h-14 rounded-full border border-gray-200 dark:border-[#2A2F3A] shadow-2xs flex-shrink-0 flex items-center justify-center bg-gray-100 dark:bg-[#161B22] overflow-hidden text-gray-500 dark:text-gray-400 font-bold text-xl uppercase">
+                            {notif.senderName ? getLocalizedName(notif.senderName, language).charAt(0) : "U"}
                           </div>
                         )}
                       </div>
                       {/* Content */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-[17px] font-bold text-gray-800 truncate">{notif.senderName}</h3>
+                          <h3 className="text-[17px] font-bold text-gray-800 dark:text-gray-200 truncate">{getLocalizedName(notif.senderName, language)}</h3>
                           {!notif.read && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
                           {(notif.priorityLevel || "Normal") && (
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              (notif.priorityLevel || "").toLowerCase() === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200' : 
-                              (notif.priorityLevel || "").toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 
-                              'bg-blue-100 text-blue-700 border border-blue-200'
-                            }`}>
-                              {notif.priorityLevel || "Normal"}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${(notif.priorityLevel || "").toLowerCase() === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20' :
+                                (notif.priorityLevel || "").toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20' :
+                                  'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+                              }`}>
+                              {t((notif.priorityLevel || "Normal").toLowerCase()) || notif.priorityLevel || "Normal"}
                             </span>
                           )}
                         </div>
-                        <p className="text-[12px] text-gray-400 font-semibold mt-1">From: {notif.senderDepartment}</p>
-                        <p className="text-[13px] text-gray-700 mt-2 flex items-start gap-1.5 font-bold">
-                          <FileText size={14} className="text-green-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-[12px] text-gray-400 dark:text-gray-500 font-semibold mt-1">{t('from') || 'From'}: {notif.senderDepartment}</p>
+                        <p className="text-[13px] text-gray-700 dark:text-gray-300 mt-2 flex items-start gap-1.5 font-bold">
+                          <FileText size={14} className="text-green-600 dark:text-[#34d399] flex-shrink-0 mt-0.5" />
                           <span className="leading-tight">{notif.subject}</span>
                         </p>
-                        <p className="text-[12px] text-gray-500 mt-1 pl-5">
+                        <p className="text-[12px] text-gray-500 dark:text-[#a1a1aa] mt-1 pl-5">
                           {notif.details}
                         </p>
                       </div>
@@ -279,13 +305,13 @@ export default function NotificationPage() {
                     {/* Timestamp */}
                     <div className="flex flex-col items-end justify-between self-stretch py-0.5 flex-shrink-0 gap-3">
                       <div className="flex flex-col items-end gap-2">
-                        <div className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5">
-                          <Calendar size={12} className="text-green-650" />
+                        <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Calendar size={12} className="text-green-650 dark:text-[#4ade80]" />
                           {notif.date} • {notif.time}
                         </div>
                         {!notif.read && (
                           <div className="flex-shrink-0 pt-0.5">
-                            <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                            <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20">
                               {t('new')}
                             </span>
                           </div>

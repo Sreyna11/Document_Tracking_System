@@ -1,20 +1,23 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { useLanguage } from "../../context/LanguageContext";
+import { useSidebar } from "../../context/SidebarContext";
+import { hasPermission } from "../../../utils/permissions";
 import { Search, ChevronLeft, ChevronRight, Eye, Calendar, FileText, CheckCircle, XCircle, Clock, AlertCircle, History } from "lucide-react";
+import CustomSelect from "@/components/CustomSelect";
 import Pagination from "../../../components/Pagination";
 export default function HistoryPage() {
   const router = useRouter();
   const { t } = useLanguage();
-  
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [requests, setRequests] = useState([]);
-  
+
   // Filters
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
@@ -22,7 +25,7 @@ export default function HistoryPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -35,23 +38,49 @@ export default function HistoryPage() {
     const user = JSON.parse(userStr);
     setCurrentUser(user);
     setIsMounted(true);
-    
+
     // Load historical requests
-    const reqs = JSON.parse(localStorage.getItem("doc_tracking_requests") || "[]");
-    
-    // Filter requests based on user role
-    const isGlobalSuperAdmin = user.email === "admin@rupp.edu.kh";
-    const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
-    
-    const relevantRequests = reqs.filter(req => {
-      if (isGlobalSuperAdmin) return true;
-      const sDept = (req.senderDepartment || "").toLowerCase().trim();
-      return userDept && sDept === userDept;
-    });
-    
-    relevantRequests.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-    setRequests(relevantRequests);
-  }, [router]);
+    const loadRequests = () => {
+      const reqs = JSON.parse(localStorage.getItem("doc_tracking_requests") || "[]");
+
+      // Filter requests based on user role
+      const isGlobalSuperAdmin = user.email === "admin@rupp.edu.kh";
+      const canViewAny = hasPermission(user, "History Request", "View Any");
+      
+      const relevantRequests = reqs.filter(req => {
+        if (isGlobalSuperAdmin || canViewAny) return true;
+        const sEmail = (req.senderEmail || "").toLowerCase().trim();
+        const uEmail = (user.email || "").toLowerCase().trim();
+        if (sEmail && uEmail && sEmail === uEmail) return true;
+        
+        const sName = (req.senderName || "").toLowerCase().trim();
+        const uName = (user.username || user.name || "").toLowerCase().trim();
+        if (sName && uName && sName === uName) return true;
+        
+        return false;
+      });
+
+      relevantRequests.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      setRequests(relevantRequests);
+    };
+
+    loadRequests();
+
+    const handleStorageChange = (e) => {
+      if (e.key === "doc_tracking_requests") loadRequests();
+    };
+    const handleRequestsUpdated = () => {
+      loadRequests();
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("requests_updated", handleRequestsUpdated);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("requests_updated", handleRequestsUpdated);
+    };
+  }, []);
   const documentTypes = useMemo(() => {
     const types = new Set();
     requests.forEach(r => {
@@ -71,7 +100,7 @@ export default function HistoryPage() {
           if (!matchesId && !matchesSubject && !matchesSubject2) return false;
         }
       }
-      
+
       // 2. Status Filter
       if (statusFilter !== "all") {
         const status = (req.status || "").toLowerCase().trim();
@@ -81,12 +110,12 @@ export default function HistoryPage() {
         } else if (filterVal === "returned") {
           if (status !== "assigned to improve" && status !== "returned") return false;
         } else if (filterVal === "declined") {
-           if (status !== "failed" && status !== "declined" && status !== "rejected") return false;
+          if (status !== "failed" && status !== "declined" && status !== "rejected") return false;
         } else if (status !== filterVal) {
           return false;
         }
       }
-      
+
       // 3. Type Filter
       if (typeFilter !== "all") {
         if (req.documentType !== typeFilter) return false;
@@ -112,14 +141,14 @@ export default function HistoryPage() {
     let approved = 0;
     let returned = 0;
     let declined = 0;
-    
+
     filteredRequests.forEach(req => {
       const status = (req.status || "").toLowerCase().trim();
       if (status === "completed" || status === "approved") approved++;
       else if (status === "assigned to improve" || status === "returned") returned++;
       else if (status === "failed" || status === "declined" || status === "rejected") declined++;
     });
-    
+
     return { total, approved, returned, declined };
   }, [filteredRequests]);
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage) || 1;
@@ -127,7 +156,7 @@ export default function HistoryPage() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, typeFilter, priorityFilter, selectedMonth, selectedYear]);
@@ -152,52 +181,95 @@ export default function HistoryPage() {
   const getStatusBadge = (status) => {
     const s = (status || "Unknown").toLowerCase().trim();
     if (s === "completed" || s === "approved") {
-      return <span className="px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-bold text-[11px] uppercase tracking-wider">{t('approved') || 'Approved'}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-extrabold text-[10px] uppercase tracking-wider border border-green-200 dark:border-green-500/20 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+          {t('approved') || 'Approved'}
+        </span>
+      );
     }
     if (s === "assigned to improve" || s === "returned") {
-      return <span className="px-2 py-1 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 font-bold text-[11px] uppercase tracking-wider">{t('returned') || 'Returned'}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 font-extrabold text-[10px] uppercase tracking-wider border border-orange-200 dark:border-orange-500/20 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+          {t('returned') || 'Returned'}
+        </span>
+      );
     }
     if (s === "failed" || s === "declined" || s === "rejected") {
-      return <span className="px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-bold text-[11px] uppercase tracking-wider">{t('declined') || 'Declined'}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400 font-extrabold text-[10px] uppercase tracking-wider border border-red-200 dark:border-red-500/20 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+          {t('declined') || 'Declined'}
+        </span>
+      );
     }
-    return <span className="px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 font-bold text-[11px] uppercase tracking-wider">{status || 'Unknown'}</span>;
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 text-gray-700 dark:bg-gray-500/10 dark:text-gray-400 font-extrabold text-[10px] uppercase tracking-wider border border-gray-200 dark:border-gray-500/20 shadow-sm">
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
+        {status || 'Unknown'}
+      </span>
+    );
   };
   const getPriorityBadge = (priority) => {
     const p = (priority || "Normal").toLowerCase().trim();
     if (p === "urgent") {
-      return <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 font-bold text-[10px]">{t('urgent') || 'Urgent'}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400 font-extrabold text-[10px] uppercase tracking-wider border border-red-200 dark:border-red-500/20 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+          {t('urgent') || 'Urgent'}
+        </span>
+      );
     }
     if (p === "high") {
-      return <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800 font-bold text-[10px]">{t('high') || 'High'}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 font-extrabold text-[10px] uppercase tracking-wider border border-orange-200 dark:border-orange-500/20 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+          {t('high') || 'High'}
+        </span>
+      );
     }
-    return <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800 font-bold text-[10px]">{t('normal') || 'Normal'}</span>;
+    if (p === "medium") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400 font-extrabold text-[10px] uppercase tracking-wider border border-yellow-200 dark:border-yellow-500/20 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+          {t('medium') || 'Medium'}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-extrabold text-[10px] uppercase tracking-wider border border-green-200 dark:border-green-500/20 shadow-sm">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+        {t('normal') || 'Normal'}
+      </span>
+    );
   };
   const calculateProcessingTime = (req) => {
     let diffMs = 0;
-    
+
     // Attempt to calculate precise accumulated time across path steps
     if (req.path && req.path.length > 0) {
       req.path.forEach((step, index) => {
         let startStr = index === 0 ? (req.date + (req.time ? ' ' + req.time : '')) : (req.path[index - 1]?.approvedAt || req.date);
         let endStr = step.approvedAt;
-        
+
         // For the active step, calculate up to now
         if (!endStr && index === (req.currentStepIndex || 0) && req.status !== "Completed" && req.status !== "Failed" && req.status !== "Assigned to Improve") {
-           endStr = new Date().toISOString();
+          endStr = new Date().toISOString();
         }
         if (startStr && endStr) {
-           const start = new Date(startStr);
-           const end = new Date(endStr);
-           if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-              let stepTime = Math.max(0, end - start);
-              // Fallback if step has a specific accumulated time (e.g. from return loop)
-              if (step.accumulatedTime) {
-                stepTime += step.accumulatedTime;
-              }
-              diffMs += stepTime;
-           }
+          const start = new Date(startStr);
+          const end = new Date(endStr);
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            let stepTime = Math.max(0, end - start);
+            // Fallback if step has a specific accumulated time (e.g. from return loop)
+            if (step.accumulatedTime) {
+              stepTime += step.accumulatedTime;
+            }
+            diffMs += stepTime;
+          }
         } else if (step.accumulatedTime) {
-           diffMs += step.accumulatedTime;
+          diffMs += step.accumulatedTime;
         }
       });
     }
@@ -208,20 +280,20 @@ export default function HistoryPage() {
       const end = req.completedDate ? new Date(req.completedDate) : new Date();
       diffMs = Math.max(0, end - start);
     }
-    
+
     if (diffMs === 0) return "< 1m";
     const diffSecs = Math.floor(diffMs / 1000);
     const days = Math.floor(diffSecs / 86400);
     const hours = Math.floor((diffSecs % 86400) / 3600);
     const mins = Math.floor((diffSecs % 3600) / 60);
     const secs = diffSecs % 60;
-    
+
     let parts = [];
     if (days > 0) parts.push(`${days}d`);
     if (hours > 0) parts.push(`${hours}h`);
     if (mins > 0) parts.push(`${mins}m`);
     if (parts.length === 0 || (days === 0 && hours === 0)) parts.push(`${secs}s`);
-    
+
     return parts.join(' ');
   };
   const getLastReceiver = (req) => {
@@ -236,7 +308,7 @@ export default function HistoryPage() {
       <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
       <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} currentUser={currentUser} />
-        
+
         <div className="p-8 md:p-10 flex-1 w-full mx-auto overflow-x-auto">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -245,7 +317,7 @@ export default function HistoryPage() {
                 History Requests
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View and manage your historical document requests and their final statuses.</p>
-      
+
             </div>
           </div>
           {/* Summary Cards */}
@@ -259,7 +331,7 @@ export default function HistoryPage() {
                 <span className="text-[24px] font-black text-gray-900 dark:text-white leading-tight">{summary.total}</span>
               </div>
             </div>
-            
+
             <div className="bg-white dark:bg-[#161B22] p-5 rounded-xl border border-gray-100 dark:border-[#2A2F3A] shadow-sm flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center">
                 <CheckCircle size={24} />
@@ -290,7 +362,7 @@ export default function HistoryPage() {
           </div>
           {/* Filters & Table Container */}
           <div className="bg-white dark:bg-[#161B22] border border-gray-100 dark:border-[#2A2F3A] rounded-xl shadow-sm flex flex-col">
-            
+
             {/* Search Section */}
             <div className="p-4 border-b border-gray-100 dark:border-[#2A2F3A] flex justify-end">
               <div className="relative w-full md:w-1/3">
@@ -305,123 +377,89 @@ export default function HistoryPage() {
               </div>
             </div>
             {/* Filter Dropdowns */}
-            <div className="p-4 border-b border-gray-100 dark:border-[#2A2F3A] grid grid-cols-1 md:grid-cols-5 gap-4">
-              <select
+            <div className="p-4 border-b border-gray-100 dark:border-[#2A2F3A] grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CustomSelect
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-[13px] text-gray-800 dark:text-white outline-none focus:border-green-500 cursor-pointer"
-              >
-                <option value="all">{t('month') || 'All Months'}</option>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                  <option key={month} value={month}>{new Date(0, month - 1).toLocaleString('default', { month: 'long' })}</option>
-                ))}
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
-                  const engMonth = new Date(0, month - 1).toLocaleString('en-US', { month: 'long' });
-                  return <option key={month} value={month}>{t(engMonth.toLowerCase()) || engMonth}</option>;
-                })}
-              </select>
-              <select
+                placeholder={t('select_month') || 'Select month...'}
+                options={[
+                  { label: t('select_month') || 'Select month...', value: "all" },
+                  ...Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
+                    const engMonth = new Date(0, month - 1).toLocaleString('en-US', { month: 'long' });
+                    return { label: t(engMonth.toLowerCase()) || engMonth, value: month.toString() };
+                  })
+                ]}
+              />
+              <CustomSelect
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-[13px] text-gray-800 dark:text-white outline-none focus:border-green-500 cursor-pointer"
-              >
-                <option value="all">{t('year') || 'All Years'}</option>
-                {availableYears.map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-[13px] text-gray-800 dark:text-white outline-none focus:border-green-500 cursor-pointer"
-              >
-                <option value="all">{t('all_types') || 'All Types'}</option>
-                {documentTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-[13px] text-gray-800 dark:text-white outline-none focus:border-green-500 cursor-pointer"
-              >
-                <option value="all">{t('all_priority') || 'All Priorities'}</option>
-                <option value="normal">{t('normal') || 'Normal'}</option>
-                <option value="high">{t('high') || 'High'}</option>
-                <option value="urgent">{t('urgent') || 'Urgent'}</option>
-              </select>
-              <select
+                placeholder={t('select_year') || 'Select year...'}
+                options={[
+                  { label: t('select_year') || 'Select year...', value: "all" },
+                  ...availableYears.map(year => ({ label: year.toString(), value: year.toString() }))
+                ]}
+              />
+              <CustomSelect
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-[13px] text-gray-800 dark:text-white outline-none focus:border-green-500 cursor-pointer"
-              >
-                <option value="all">{t('all_status') || 'All Status'}</option>
-                <option value="completed">{t('approved') || 'Approved'}</option>
-                <option value="returned">{t('returned') || 'Returned'}</option>
-                <option value="declined">{t('declined') || 'Declined'}</option>
-              </select>
+                placeholder={t('select_status') || 'Select status...'}
+                options={[
+                  { label: t('select_status') || 'Select status...', value: "all" },
+                  { label: t('approved') || 'Approved', value: "completed" },
+                  { label: t('returned') || 'Returned', value: "returned" },
+{ label: t('declined') || 'Declined', value: "declined" }
+                ]}
+              />
             </div>
             {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
-                <thead className="bg-gray-50 dark:bg-[#242B36] text-gray-600 dark:text-[#a1a1aa] font-bold text-[13px]">
-                  <tr>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">ID</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('type_document')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('title') || 'Title'}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('sender')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('receiver')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A] text-center">{t('status')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('priority')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('date')}</th>
-                    <th className="py-3 px-4 border-b border-gray-100 dark:border-[#2A2F3A]">{t('duration') || 'Duration'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-[#2A2F3A]">
-                  {paginatedRequests.map((req) => {
-                    const senderNameRaw = req.senderName || req.senderEmail || 'Unknown';
-                    const englishSender = senderNameRaw.replace(/[ក-៯]+/g, '').replace(/\//g, '').trim() || senderNameRaw;
+            <div className="flex flex-col gap-4 p-4 md:p-6 bg-white dark:bg-[#161B22]">
+              {paginatedRequests.map((req) => {
+                const senderNameRaw = req.senderName || req.senderEmail || 'Unknown';
+                const englishSender = senderNameRaw.replace(/[ក-៯]+/g, '').replace(/\//g, '').trim() || senderNameRaw;
+                const d = new Date(req.date || 0);
+                const timeString = req.time || (!isNaN(d.getTime()) && req.date ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "");
+                
+                return (
+                  <div
+                    key={req.id}
+                    onClick={() => router.push(`/content/tracking-document?id=${req.id}`)}
+                    className="group bg-white dark:bg-[#161B22] p-5 rounded-xl border border-gray-100 dark:border-[#2A2F3A] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:border-gray-300 dark:hover:border-gray-500 transition-all gap-4"
+                  >
+                    <div className="flex items-center gap-5">
+                      <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden border border-blue-200 dark:border-blue-800">
+                        <img 
+                          src={req.profilePhoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(englishSender)}&background=bfdbfe&color=1e3a8a&size=128&bold=true`} 
+                          alt={englishSender} 
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1 tracking-tight">{englishSender}</h3>
+                        <p className="text-[13px] text-gray-400 dark:text-gray-500 mb-0.5">From: {req.department || 'N/A'}</p>
+                        <p className="text-[13px] text-gray-400 dark:text-gray-500 mb-0.5">Subject: {req.title || req.subject || 'No Subject'}</p>
+                        <p className="text-[13px] text-gray-400 dark:text-gray-500">Attached file : {req.attachment || 'No attachment'}</p>
+                      </div>
+                    </div>
                     
-                    let receiverRaw = getLastReceiver(req);
-                    if (req.path && req.path.length > 0) {
-                      const lastStep = req.path[req.path.length - 1];
-                      receiverRaw = lastStep.userSign || lastStep.reviewerName || lastStep.assignedTo || receiverRaw;
-                    }
-                    const englishReceiver = receiverRaw.replace(/[ក-៯]+/g, '').replace(/\//g, '').trim() || receiverRaw;
-                    const d = new Date(req.date || 0);
-                    const formattedDate = !isNaN(d.getTime()) ? `${d.getDate()}, ${d.toLocaleString('default', { month: 'long' })}, ${d.getFullYear()}` : req.date;
-                    return (
-                    <tr 
-                      key={req.id} 
-                      onClick={() => router.push(`/content/tracking-document?id=${req.id}`)}
-                      className="hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-mono font-bold text-gray-500">{req.id || 'N/A'}</td>
-                      <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">{req.documentType}</td>
-                      <td className="py-3 px-4 text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title={req.title || req.subject}>{req.title || req.subject}</td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{englishSender}</td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{englishReceiver}</td>
-                      <td className="py-3 px-4 text-center">{getStatusBadge(req.status)}</td>
-                      <td className="py-3 px-4">{getPriorityBadge(req.priorityLevel)}</td>
-                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formattedDate}</td>
-                      <td className="py-3 px-4 text-gray-500 dark:text-gray-400 whitespace-nowrap font-medium flex items-center gap-1.5"><Clock size={13} className="text-blue-500" />{calculateProcessingTime(req)}</td>
-                    </tr>
-                    );
-                  })}
-                  {paginatedRequests.length === 0 && (
-                    <tr>
-                      <td colSpan="11" className="py-12 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <History size={48} className="text-gray-300 dark:text-gray-600 mb-3 stroke-[1.5]" />
-                          <h3 className="text-[16px] font-bold text-gray-800 dark:text-gray-200 mb-1">{t('no_history') || 'No history requests found.'}</h3>
-                          <p className="text-[13px] text-gray-500 dark:text-gray-400">{t('no_history_desc') || 'You do not have any historical requests matching your criteria.'}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    <div className="flex flex-col items-end justify-between h-full self-stretch md:self-auto min-h-[60px]">
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{timeString}</span>
+                      <div className="mt-4 md:mt-0">
+                        {getStatusBadge(req.status)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
               
+              {paginatedRequests.length === 0 && (
+                <div className="py-16 text-center flex flex-col items-center justify-center bg-gray-50 dark:bg-[#161B22] rounded-xl border border-dashed border-gray-200 dark:border-gray-800">
+                  <History size={48} className="text-gray-300 dark:text-gray-600 mb-3 stroke-[1.5]" />
+                  <h3 className="text-[16px] font-bold text-gray-800 dark:text-gray-200 mb-1">{t('no_history') || 'No history requests found.'}</h3>
+                  <p className="text-[13px] text-gray-500 dark:text-gray-400">{t('no_history_desc') || 'You do not have any historical requests matching your criteria.'}</p>
+                </div>
+              )}
+            </div>
+
               {/* Pagination */}
               {paginatedRequests.length > 0 && (
                 <Pagination
@@ -434,8 +472,7 @@ export default function HistoryPage() {
               )}
             </div>
           </div>
-        </div>
-      </main>
-    </div>
-  );
-}
+        </main>
+      </div>
+    );
+  }

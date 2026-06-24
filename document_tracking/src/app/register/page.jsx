@@ -36,10 +36,31 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 1500));
-    setLoading(false);
-    setSuccess(true);
+    
+    try {
+      const response = await fetch("http://document_tracking_system.test/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          username: username,
+          email: email,
+          password: password,
+          password_confirmation: confirmPassword
+        })
+      });
+
+      if (response.ok) {
+        setSuccess(true);
+      } else {
+        const errData = await response.json();
+        setError(errData.message || "Registration failed. Email might already be taken.");
+      }
+    } catch (err) {
+      console.error("Registration error", err);
+      setError("Failed to connect to the server.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -208,13 +229,6 @@ export default function RegisterPage() {
             </p>
           </div>
         </div>
-      </div>
-
-      {/* Subtle Footer */}
-      <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
-        <p className="text-[11px] font-medium text-green-100/60">
-          © {new Date().getFullYear()} Royal University of Phnom Penh. All rights reserved.
-        </p>
       </div>
     </main>
   );

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import { Eye, EyeOff, User, Lock, LogIn, Loader2, Mail, UserPlus } from "lucide-react";
 export default function LoginPage() {
     const router = useRouter();
@@ -22,95 +22,39 @@ export default function LoginPage() {
     setLoading(false);
     
     const lowerEmail = email.toLowerCase().trim();
-    // 1. Check created users database in localStorage
-    let registeredUsers = [];
     try {
-      const storedUsers = localStorage.getItem("doc_tracking_users");
-      if (storedUsers) {
-        const parsed = JSON.parse(storedUsers);
-        registeredUsers = Array.isArray(parsed) ? parsed : [];
+      const response = await fetch("http://document_tracking_system.test/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ email: lowerEmail, password: password })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const user = data.user;
+        
+        sessionStorage.setItem("auth_token", data.token);
+        sessionStorage.setItem("isAdminAuthenticated", user.role?.role_name === "Super Admin" ? "true" : "false");
+        
+        sessionStorage.setItem("currentUser", JSON.stringify({
+          username: user.full_name || user.username,
+          email: user.email,
+          role: user.role?.role_name || "Staff",
+          type: user.role?.role_name || "Staff",
+          department: user.department?.name || "Global",
+          permissions: user.role?.permissions || {}
+        }));
+        
+        router.push("/content");
+        return;
+      } else {
+        const errData = await response.json();
+        setError(errData.message || "Invalid email or password.");
       }
-    } catch (e) {
-      console.error("Error loading registered users", e);
+    } catch (err) {
+      console.error("Login error", err);
+      setError("Failed to connect to the server.");
     }
-    const matchedUser = registeredUsers.find(
-      (u) => u.email.toLowerCase().trim() === lowerEmail && u.password === password
-    );
-    if (matchedUser) {
-      sessionStorage.setItem("isAdminAuthenticated", matchedUser.role === "System Admin" ? "true" : "false");
-      sessionStorage.setItem(
-        "currentUser",
-        JSON.stringify({
-          username: `${matchedUser.firstName} ${matchedUser.lastName}`,
-          email: matchedUser.email,
-          role: matchedUser.role,
-          department: matchedUser.department || "ITC",
-        })
-      );
-      router.push("/content");
-      return;
-    }
-    // 2. Fallback to hardcoded testing accounts
-    if (password === "admin1234") {
-      if (lowerEmail === "admin" || lowerEmail === "admin@rupp.edu.kh" || lowerEmail === "sysadmin") {
-        sessionStorage.setItem("isAdminAuthenticated", "true");
-        sessionStorage.setItem(
-          "currentUser",
-          JSON.stringify({
-            username: "System Admin",
-            email: "admin@rupp.edu.kh",
-            role: "System Admin",
-            department: "Global",
-          })
-        );
-        router.push("/content");
-        return;
-      }
-      if (lowerEmail === "itcsuper" || lowerEmail === "admin@rupp.edu.kh") {
-        sessionStorage.setItem("isAdminAuthenticated", "false");
-        sessionStorage.setItem(
-          "currentUser",
-          JSON.stringify({
-            username: "ITC Super Admin",
-            email: "itcsuper@rupp.edu.kh",
-            role: "ITC Super Admin",
-            department: "ITC",
-          })
-        );
-        router.push("/content");
-        return;
-      }
-      if (lowerEmail === "itcadmin" || lowerEmail === "itcadmin@rupp.edu.kh") {
-        sessionStorage.setItem("isAdminAuthenticated", "false");
-        sessionStorage.setItem(
-          "currentUser",
-          JSON.stringify({
-            username: "ITC Admin User",
-            email: "itcadmin@rupp.edu.kh",
-            role: "ITC Admin",
-            department: "ITC",
-          })
-        );
-        router.push("/content");
-        return;
-      }
-      if (lowerEmail === "itcstaff" || lowerEmail === "itcstaff@rupp.edu.kh") {
-        sessionStorage.setItem("isAdminAuthenticated", "false");
-        sessionStorage.setItem(
-          "currentUser",
-          JSON.stringify({
-            username: "ITC Staff User",
-            email: "itcstaff@rupp.edu.kh",
-            role: "ITC Staff",
-            department: "ITC",
-          })
-        );
-        router.push("/content");
-        return;
-      }
-    }
-    // 3. Fallback failed, show invalid credentials error
-    setError("Invalid email or password.");
   };
     return (
         <main
@@ -242,11 +186,6 @@ export default function LoginPage() {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                    <div className="pt-6 text-center border-t border-gray-50">
-                        <p className="text-[10px] text-gray-400">
-                            © {new Date().getFullYear()} Royal University of Phnom Penh. All rights reserved.
-                        </p>
                     </div>
                 </div>
             </div>
