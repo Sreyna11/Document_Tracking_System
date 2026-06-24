@@ -9,7 +9,8 @@ export default function SearchableSelect({
   disabled = false,
   placeholder = "Search department...",
   selectPlaceholder = "Select department",
-  className = ""
+  className = "",
+  getDisplayValue = (val) => val
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -53,13 +54,13 @@ export default function SearchableSelect({
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-left text-[14px] bg-gray-50 dark:bg-[#242B36] outline-none transition-all ${
           disabled
-            ? "opacity-70 cursor-not-allowed border-gray-300 dark:border-[#2A2F3A] text-gray-500"
+            ? "bg-gray-100 dark:bg-[#1a202c] cursor-not-allowed border-gray-300 dark:border-[#2A2F3A] text-gray-800 dark:text-gray-300 font-medium"
             : isOpen
             ? "border-[#1a5b28] ring-1 ring-[#1a5b28] text-black dark:text-white cursor-pointer"
             : "border-gray-300 dark:border-[#2A2F3A] text-black dark:text-white cursor-pointer hover:border-gray-400 dark:hover:border-[#475569]"
         }`}
       >
-        <span className="truncate">{value || selectPlaceholder}</span>
+        <span className="truncate">{value ? getDisplayValue(value) : selectPlaceholder}</span>
         <ChevronDown
           size={16}
           className={`text-gray-400 transition-transform duration-200 ${
@@ -103,7 +104,7 @@ export default function SearchableSelect({
                         : "hover:bg-gray-50 dark:hover:bg-[#242B36] text-gray-700 dark:text-gray-200"
                     }`}
                   >
-                    <span className="truncate">{option}</span>
+                    <span className="truncate">{getDisplayValue(option)}</span>
                     {isSelected && (
                       <Check
                         size={14}

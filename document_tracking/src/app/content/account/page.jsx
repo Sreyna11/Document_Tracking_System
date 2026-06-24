@@ -29,13 +29,132 @@ import { useSidebar } from "../../context/SidebarContext";
 import Pagination from "../../../components/Pagination";
 import DeleteConfirmationModal from "../../../components/DeleteConfirmationModal";
 import SearchableSelect from "../../../components/SearchableSelect";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+const fetchWithAuth = (url, options = {}) => {
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+    }
+  });
+};
+
 export default function AccountPage() {
   const router = useRouter();
   const { t, language } = useLanguage();
   const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
+  const queryClient = useQueryClient();
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [dynamicRoles, setDynamicRoles] = useState([]);
+
+  // Queries
+  const { data: departmentsList = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const res = await fetchWithAuth('http://document_tracking_system.test/api/job-departments');
+      return res.json();
+    }
+  });
+
+  const { data: usersList = [], isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const res = await fetchWithAuth('http://document_tracking_system.test/api/accounts');
+      return res.json();
+    }
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ isEdit, id, payload }) => {
+      const url = isEdit 
+        ? `http://document_tracking_system.test/api/accounts/${id}`
+        : 'http://document_tracking_system.test/api/accounts';
+      
+      const res = await fetchWithAuth(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || `Failed to ${isEdit ? 'update' : 'create'} user.`);
+      }
+      return res.json();
+    },
+    onSuccess: async (_, { isEdit, id, payload }) => {
+      await queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      
+      const sessionUserStr = sessionStorage.getItem("currentUser");
+      if (isEdit && sessionUserStr) {
+        const sessionUser = JSON.parse(sessionUserStr);
+        if (sessionUser.id === id || sessionUser.email === payload.email.trim()) {
+          const res = await fetchWithAuth('http://document_tracking_system.test/api/me');
+          if (res.ok) {
+            const updatedSession = await res.json();
+            sessionStorage.setItem("currentUser", JSON.stringify(updatedSession));
+          }
+        }
+      }
+      
+      setViewState('LIST');
+      resetForm();
+    },
+    onError: (error) => {
+      console.error(error);
+      showAlert(error.message || "An error occurred while saving.");
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ isBulk, selectedIds, singleId }) => {
+      if (isBulk) {
+        for (const id of selectedIds) {
+          await fetchWithAuth(`http://document_tracking_system.test/api/accounts/${id}`, { method: 'DELETE' });
+        }
+      } else if (singleId) {
+        await fetchWithAuth(`http://document_tracking_system.test/api/accounts/${singleId}`, { method: 'DELETE' });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setSelectedRows([]);
+      setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null });
+    },
+    onError: (error) => {
+      console.error(error);
+      showAlert("Error deleting user.");
+    }
+  });
+
+  // Derived state from queries
+  const mainRoles = departmentsList.length > 0 ? [...new Set(departmentsList.map(d => d.title))] : ["IT Center", "Office of Planning and Finance"];
+  
+  const dynamicRoles = [];
+  if (departmentsList.length > 0) {
+    departmentsList.forEach(dept => {
+      if (Array.isArray(dept.roles)) {
+        dept.roles.forEach(role => {
+          dynamicRoles.push({
+            title: role.title,
+            type: role.type || "Staff",
+            department: dept.title
+          });
+        });
+      }
+    });
+    if (dynamicRoles.length === 0) {
+      mainRoles.forEach(dept => {
+        dynamicRoles.push(
+          { title: "Super Admin", type: "Super Admin", department: dept },
+          { title: "Admin", type: "Admin", department: dept },
+          { title: "Staff", type: "Staff", department: dept }
+        );
+      });
+    }
+  }
+
   // View state: 'LIST', 'CREATE', 'VIEW'
   const [viewState, setViewState] = useState('LIST');
   const [selectedUserView, setSelectedUserView] = useState(null);
@@ -44,8 +163,8 @@ export default function AccountPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   // Form Fields
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [fullname_kh, setFullname_kh] = useState("");
+  const [fullname_en, setFullname_en] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,16 +174,15 @@ export default function AccountPage() {
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [signaturePhoto, setSignaturePhoto] = useState(null);
   const [status, setStatus] = useState("Active");
-  // Lists loaded from localStorage
-  const [mainRoles, setMainRoles] = useState([]);
-  const [usersList, setUsersList] = useState([]);
+  
   const [showSuccess, setShowSuccess] = useState(false);
+  
   // Table specific states
   const [searchTerm, setSearchTerm] = useState("");
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState([]);
-  // Custom Delete Confirmation State
+  
   // Alert Modal State
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "" });
   const showAlert = (message) => setAlertModal({ isOpen: true, message });
@@ -73,6 +191,7 @@ export default function AccountPage() {
     isBulk: false,
     userId: null,
   });
+
   useEffect(() => {
     const userStr = sessionStorage.getItem("currentUser");
     if (!userStr) {
@@ -81,102 +200,12 @@ export default function AccountPage() {
     }
     const user = JSON.parse(userStr);
     setCurrentUser(user);
-    let savedMainRoles = ["IT Center", "Office of Planning and Finance"];
-    try {
-      const storedDepts = localStorage.getItem("doc_tracking_departments");
-      if (storedDepts) {
-        const parsed = JSON.parse(storedDepts);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          savedMainRoles = [...new Set(parsed.map(d => d.title))];
-        }
-      } else {
-        // Fallback to old main roles if departments not found
-        const storedMainRoles = localStorage.getItem("doc_tracking_main_roles");
-        if (storedMainRoles) {
-          const parsed = JSON.parse(storedMainRoles);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            if (!parsed.includes("super admin") && !parsed.includes("Staff")) {
-              savedMainRoles = parsed;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    setMainRoles(savedMainRoles);
-    let loadedUsers = [];
-    try {
-      const storedUsers = localStorage.getItem("doc_tracking_users");
-      if (storedUsers) {
-        const parsed = JSON.parse(storedUsers);
-        loadedUsers = Array.isArray(parsed) ? parsed : [];
-        setUsersList(loadedUsers);
-      } else {
-        setUsersList([]);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    const isGAdmin = user?.email === "admin@rupp.edu.kh";
-
-    const adminCheckStr1 = (user?.type || user?.role || "").toLowerCase();
-    const isDAdmin = adminCheckStr1.includes("super admin") || adminCheckStr1 === "admin";
-    if (!isGAdmin && !isDAdmin) {
-      setViewState('VIEW');
-      const foundUser = loadedUsers.find(u => u.email === user.email) || {
-        firstName: user.username?.split(' ')[0] || user.username || '',
-        lastName: user.username?.split(' ').slice(1).join(' ') || '',
-        phone: 'N/A',
-        email: user.email,
-        mainRole: user.mainRole,
-        department: user.department,
-        role: user.role,
-        profilePhoto: user.profilePhoto,
-        signaturePhoto: user.signaturePhoto,
-        status: 'Active'
-      };
-      setSelectedUserView(foundUser);
-    }
-    let extractedRoles = [];
-    try {
-      const storedDepts = localStorage.getItem("doc_tracking_departments");
-      if (storedDepts) {
-        const parsed = JSON.parse(storedDepts);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(dept => {
-            if (Array.isArray(dept.roles)) {
-              dept.roles.forEach(role => {
-                extractedRoles.push({
-                  title: role.title,
-                  type: role.type || "Staff",
-                  department: dept.title
-                });
-              });
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    if (extractedRoles.length === 0) {
-      savedMainRoles.forEach(dept => {
-        extractedRoles.push(
-          { title: "Super Admin", type: "Super Admin", department: dept },
-          { title: "Admin", type: "Admin", department: dept },
-          { title: "Staff", type: "Staff", department: dept }
-        );
-      });
-    }
-    setDynamicRoles(extractedRoles);
 
     if (user.role && (user.role.toLowerCase().includes("super admin") || user.role.toLowerCase() === "admin")) {
       const userDept = user.department || user.mainRole || "Default";
       setSelectedMainRole(userDept);
-    } else if (savedMainRoles.length > 0) {
-      setSelectedMainRole(savedMainRoles[0]);
+    } else {
+      setSelectedMainRole("IT Center");
     }
     setIsMounted(true);
   }, []);
@@ -197,6 +226,19 @@ export default function AccountPage() {
     }
     return roleNames;
   };
+  
+  const canViewAny = hasPermission(currentUser, "Account", "View Any");
+  useEffect(() => {
+    if (isMounted && !canViewAny && viewState === 'LIST' && usersList.length > 0) {
+      const me = usersList.find(u => u.email === currentUser?.email) || {
+        ...currentUser,
+        firstName: currentUser?.username?.split(' ')[0] || currentUser?.username || '',
+        lastName: currentUser?.username?.split(' ').slice(1).join(' ') || ''
+      };
+      setSelectedUserView(me);
+      setViewState('VIEW');
+    }
+  }, [isMounted, canViewAny, viewState, usersList, currentUser]);
   if (!isMounted) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#242B36] flex items-center justify-center select-none">
@@ -207,10 +249,10 @@ export default function AccountPage() {
   const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
   const adminCheckStr = (currentUser?.type || currentUser?.role || "").toLowerCase();
   const isDepartmentAdmin = adminCheckStr.includes("super admin") || adminCheckStr === "admin";
-  const hasAccess = true;
+  const hasAccess = hasPermission(currentUser, "Account", "View");
   const resetForm = () => {
-    setFirstName("");
-    setLastName("");
+    setFullname_kh("");
+    setFullname_en("");
     setPhone("");
     setEmail("");
     setPassword("");
@@ -275,10 +317,10 @@ export default function AccountPage() {
   const handleEditClick = (user) => {
     setIsEditMode(true);
     setEditingUserId(user.id);
-    setFirstName(user.firstName);
-    setLastName(user.lastName);
-    setEmail(user.email);
-    setPhone(user.phone);
+    setFullname_kh(user.fullname_kh || "");
+    setFullname_en(user.fullname_en || "");
+    setEmail(user.email || "");
+    setPhone(user.phone || "");
     setPassword(user.password || "");
     setSelectedMainRole(user.mainRole || user.department || "");
     setSelectedRole(user.role || "");
@@ -288,9 +330,9 @@ export default function AccountPage() {
     setStatus(user.status || "Active");
     setViewState('CREATE');
   };
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim() || !phone.trim() || !email.trim() || (!password && !isEditMode)) {
+    if (!fullname_kh.trim() || !fullname_en.trim() || !phone.trim() || !email.trim() || (!password && !isEditMode)) {
       showAlert("Please fill all required fields.");
       return;
     }
@@ -298,75 +340,22 @@ export default function AccountPage() {
       showAlert("Please configure and select a valid Department and Role.");
       return;
     }
-    if (isEditMode) {
-      const updatedUsers = usersList.map(u => {
-        if (u.id === editingUserId) {
-          return {
-            ...u,
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            phone: phone.trim(),
-            email: email.trim(),
-            password: password ? password : u.password,
-            mainRole: selectedMainRole,
-            department: selectedMainRole,
-            role: selectedRole,
-            type: selectedType,
-            profilePhoto: profilePhoto,
-            signaturePhoto: signaturePhoto,
-            status: status
-          };
-        }
-        return u;
-      });
-      setUsersList(updatedUsers);
-      localStorage.setItem("doc_tracking_users", JSON.stringify(updatedUsers));
 
-      const sessionUserStr = sessionStorage.getItem("currentUser");
-      if (sessionUserStr) {
-        const sessionUser = JSON.parse(sessionUserStr);
-        if (sessionUser.id === editingUserId || sessionUser.email === email.trim()) {
-          const newSessionUser = updatedUsers.find(u => u.id === editingUserId);
-          if (newSessionUser) {
-            sessionStorage.setItem("currentUser", JSON.stringify(newSessionUser));
-          }
-        }
-      }
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        setViewState('LIST');
-        resetForm();
-      }, 1000);
-    } else {
-      const newUser = {
-        id: "usr-" + Date.now(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        password: password,
-        mainRole: selectedMainRole,
-        department: selectedMainRole,
-        role: selectedRole,
-        type: selectedType,
-        profilePhoto: profilePhoto,
-        signaturePhoto: signaturePhoto,
-        status: status
-      };
-      const updatedUsers = [...usersList, newUser];
-      setUsersList(updatedUsers);
-      localStorage.setItem("doc_tracking_users", JSON.stringify(updatedUsers));
-      setSearchTerm("");
-      const newTotalPages = Math.ceil(updatedUsers.length / itemsPerPage) || 1;
-      setCurrentPage(newTotalPages);
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        setViewState('LIST');
-        resetForm();
-      }, 1000);
-    }
+    const payload = {
+      fullname_kh: fullname_kh.trim(),
+      fullname_en: fullname_en.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      password: password,
+      department: selectedMainRole,
+      role: selectedRole,
+      type: selectedType,
+      profilePhoto: profilePhoto,
+      signaturePhoto: signaturePhoto,
+      status: status
+    };
+
+    saveMutation.mutate({ isEdit: isEditMode, id: editingUserId, payload });
   };
   const handleDeleteUser = (userId) => {
     setDeleteModalConfig({
@@ -375,19 +364,12 @@ export default function AccountPage() {
       userId: userId
     });
   };
-  const confirmDelete = () => {
-    if (deleteModalConfig.isBulk) {
-      const newUsers = usersList.filter(u => !selectedRows.includes(u.id));
-      setUsersList(newUsers);
-      localStorage.setItem("doc_tracking_users", JSON.stringify(newUsers));
-      setSelectedRows([]);
-    } else if (deleteModalConfig.userId) {
-      const updatedUsers = usersList.filter(u => u.id !== deleteModalConfig.userId);
-      setUsersList(updatedUsers);
-      localStorage.setItem("doc_tracking_users", JSON.stringify(updatedUsers));
-      setSelectedRows(prev => prev.filter(rowId => rowId !== deleteModalConfig.userId));
-    }
-    setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null });
+  const confirmDelete = async () => {
+    deleteMutation.mutate({ 
+      isBulk: deleteModalConfig.isBulk, 
+      selectedIds: selectedRows, 
+      singleId: deleteModalConfig.userId 
+    });
   };
   const handleSelectAll = () => {
     setSelectedRows(paginatedUsers.map(u => u.id));
@@ -416,6 +398,11 @@ export default function AccountPage() {
   };
   const filteredUsers = usersList.filter(user => {
     if (!isGlobalSuperAdmin) {
+      // If the user does not have View Any permission, they can only see their own account
+      if (!canViewAny && user.email !== currentUser?.email) {
+        return false;
+      }
+      
       const allowedDept = (currentUser?.department || currentUser?.mainRole || "").toLowerCase().trim();
       const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
       if (allowedDept && userDept !== allowedDept) return false;
@@ -501,8 +488,8 @@ export default function AccountPage() {
                             <th className="py-3 px-4">Full Name</th>
                             <th className="py-3 px-4">Email</th>
                             <th className="py-3 px-4">Department</th>
-                            <th className="py-3 px-4">Title</th>
                             <th className="py-3 px-4">Role</th>
+                            <th className="py-3 px-4">Type</th>
                             <th className="py-3 px-4 w-24"></th>
                           </tr>
                         </thead>
@@ -521,13 +508,13 @@ export default function AccountPage() {
                                     <img src={user.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover object-top border border-gray-200 dark:border-[#2A2F3A]" />
                                   ) : (
                                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 dark:text-[#a1a1aa] text-[12px] font-bold flex items-center justify-center border border-gray-300 dark:border-[#2A2F3A]">
-                                      {getInitials(user.firstName, user.lastName)}
+                                      {getInitials(user.fullname_en, "")}
                                     </div>
                                   )}
                                 </td>
                                 <td className="py-3 px-4">
-                                  <div className="font-semibold text-black dark:text-white">{user.firstName}</div>
-                                  <div className="text-[12px] text-gray-500 dark:text-[#a1a1aa]">{user.lastName}</div>
+                                  <div className="font-semibold text-black dark:text-white">{user.fullname_kh}</div>
+                                  <div className="text-[12px] text-gray-500 dark:text-[#a1a1aa]">{user.fullname_en}</div>
                                 </td>
                                 <td className="py-3 px-4">
                                   {user.email}
@@ -574,7 +561,7 @@ export default function AccountPage() {
                                               onClick={() => { setActionMenuOpen(null); handleEditClick(user); }}
                                               className="w-full text-left px-4 py-2 text-[13px] text-[#dcb23c] hover:bg-[#fff9e6] flex items-center gap-2 transition-colors"
                                             >
-                                              <Edit size={14} /> {t("edit_user")}
+                                              <Edit size={14} /> {t("edit") || "Edit"}
                                             </button>
                                           )}
                                           {hasPermission(currentUser, "Account", "Delete") && (
@@ -582,7 +569,7 @@ export default function AccountPage() {
                                               onClick={() => { setActionMenuOpen(null); handleDeleteUser(user.id); }}
                                               className="w-full text-left px-4 py-2 text-[13px] text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                                             >
-                                              <Trash2 size={14} /> {t("delete_confirmation")}
+                                              <Trash2 size={14} /> {t("delete") || "Delete"}
                                             </button>
                                           )}
                                         </div>
@@ -636,9 +623,9 @@ export default function AccountPage() {
                           setViewState('LIST');
                           resetForm();
                         }}
-                        className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
+                        className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:hover:bg-[#242B36] dark:bg-[#242B36]0 text-white text-[14px] font-medium rounded-md transition-colors"
                       >
-                        Back
+                        {t("back")}
                       </button>
                     </div>
                   </div>
@@ -683,26 +670,26 @@ export default function AccountPage() {
                           <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                             <div>
                               <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                                {t("first_name")} <span className="text-red-500">*</span>
+                                {t("Full Name (KH)")} <span className="text-red-500">*</span>
                               </label>
                               <input
                                 type="text"
                                 required
-                                value={firstName}
-                                onChange={(e) => setFirstName(e.target.value)}
+                                value={fullname_kh}
+                                onChange={(e) => setFullname_kh(e.target.value)}
                                 placeholder="ឈ្មោះពេញ"
                                 className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
                               />
                             </div>
                             <div>
                               <label className="block text-[13px] font-bold text-black dark:text-white mb-1">
-                                {t("last_name")} <span className="text-red-500">*</span>
+                                {t("Full Name (EN)")} <span className="text-red-500">*</span>
                               </label>
                               <input
                                 type="text"
                                 required
-                                value={lastName}
-                                onChange={(e) => setLastName(e.target.value)}
+                                value={fullname_en}
+                                onChange={(e) => setFullname_en(e.target.value)}
                                 placeholder="Fullname"
                                 className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36]"
                               />
@@ -791,7 +778,7 @@ export default function AccountPage() {
                                       className={`w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-[#2A2F3A] focus:border-[#1a5b28] outline-none text-[14px] bg-gray-50 dark:bg-[#242B36] ${!isGlobalSuperAdmin ? "opacity-70 cursor-not-allowed" : ""}`}
                                     />
                                   ) : (
-                                                                    <SearchableSelect
+                                  <SearchableSelect
                                       options={mainRoles}
                                       value={selectedMainRole}
                                       onChange={handleMainRoleChange}
@@ -870,15 +857,15 @@ export default function AccountPage() {
                           onClick={() => handleEditClick(selectedUserView)}
                           className="px-6 py-2 bg-[#dcb23c] hover:bg-[#c29c30] text-white text-[14px] font-medium rounded-md transition-colors"
                         >
-                          Edit
+                          {t("edit")}
                         </button>
                       )}
                       {(isGlobalSuperAdmin || isDepartmentAdmin) && (
                         <button
                           onClick={() => setViewState('LIST')}
-                          className="px-6 py-2 bg-gray-400 hover:bg-gray-50 dark:hover:bg-[#242B36] text-white text-[14px] font-medium rounded-md transition-colors"
+                          className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:hover:bg-[#242B36] text-white text-[14px] font-medium rounded-md transition-colors"
                         >
-                          Back
+                          {t("back")}
                         </button>
                       )}
                     </div>
@@ -951,16 +938,18 @@ export default function AccountPage() {
                         </div>
                         <div>
                           <div className="text-[14px] font-bold text-black dark:text-white mb-1">Campus Suite</div>
-                          <div className="text-[#1a5b28] text-[14px]">{selectedUserView.campusSuite}</div>
+                          <div className="text-[#1a5b28] text-[14px]">
+                            {departmentsList.find(d => d.title === (selectedUserView.mainRole || selectedUserView.department))?.campusSuite || "-"}
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[14px] font-bold text-black dark:text-white mb-1">Title</div>
+                          <div className="text-[14px] font-bold text-black dark:text-white mb-1">Role</div>
                           <div className="text-[#1a5b28] text-[14px]">
                             {selectedUserView.role}
                           </div>
                         </div>
                         <div>
-                          <div className="text-[14px] font-bold text-black dark:text-white mb-1">Role</div>
+                          <div className="text-[14px] font-bold text-black dark:text-white mb-1">Type</div>
                           <div className="text-[#1a5b28] text-[14px]">
                             {selectedUserView.type ? (
                               <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[11px] font-bold rounded-sm ${selectedUserView.type.toLowerCase().trim() === "super admin" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/30" :
@@ -987,13 +976,18 @@ export default function AccountPage() {
         onClose={() => setDeleteModalConfig({ isOpen: false, isBulk: false, userId: null })}
         onConfirm={confirmDelete}
         itemCount={deleteModalConfig.isBulk ? selectedRows.length : 1}
-        itemName={
-          !deleteModalConfig.isBulk && deleteModalConfig.userId
-            ? (language === 'en'
-              ? usersList.find(u => u.id === deleteModalConfig.userId)?.lastName
-              : usersList.find(u => u.id === deleteModalConfig.userId)?.firstName)
-            : ""
-        }
+        itemName={(() => {
+          const targetId = (!deleteModalConfig.isBulk && deleteModalConfig.userId) 
+            ? deleteModalConfig.userId 
+            : (deleteModalConfig.isBulk && selectedRows.length === 1) 
+              ? selectedRows[0] 
+              : null;
+              
+          if (!targetId) return "";
+          
+          const targetUser = usersList.find(u => u.id === targetId);
+          return language === 'en' ? targetUser?.fullname_en : targetUser?.fullname_kh;
+        })()}
         itemType="users"
       />
       {/* Custom Alert Modal */}

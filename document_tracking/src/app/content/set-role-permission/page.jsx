@@ -18,7 +18,8 @@ import {
   RotateCcw,
   CheckSquare,
   Save,
-  Shield
+  Shield,
+  History
 } from "lucide-react";
 import AlertModal from "../../../components/AlertModal";
 import { useLanguage } from "../../context/LanguageContext";
@@ -40,7 +41,8 @@ export default function SetRolePermissionPage() {
     "Account",
     "Job Department",
     "Set Role Permission",
-    "Type Document"
+    "Type Document",
+    "History Request"
   ];
   const actions = ["Create", "Edit", "View", "View Any", "Delete"];
 
@@ -52,7 +54,8 @@ export default function SetRolePermissionPage() {
     "Account": { icon: Users, color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
     "Job Department": { icon: Briefcase, color: "text-violet-500 bg-violet-50 dark:bg-violet-900/20" },
     "Set Role Permission": { icon: ShieldCheck, color: "text-rose-500 bg-rose-50 dark:bg-rose-900/20" },
-    "Type Document": { icon: Settings, color: "text-teal-500 bg-teal-50 dark:bg-teal-900/20" }
+    "Type Document": { icon: Settings, color: "text-teal-500 bg-teal-50 dark:bg-teal-900/20" },
+    "History Request": { icon: History, color: "text-orange-500 bg-orange-50 dark:bg-orange-900/20" }
   };
 
   const [selectedRole, setSelectedRole] = useState({ dept: "", role: "" });
@@ -76,6 +79,23 @@ export default function SetRolePermissionPage() {
     }
   }, [permissions, savedPermissions]);
 
+  const fetchPermissionsForRole = async (dept, role) => {
+    const key = `${dept}-${role}`;
+    try {
+      const response = await fetch(`http://document_tracking_system.test/api/permissions?department=${encodeURIComponent(dept)}&type=${encodeURIComponent(role)}`);
+      const data = await response.json();
+      const rolePerms = data.permissions || {};
+      const initialPerms = {};
+      menus.forEach(menu => {
+        initialPerms[menu] = rolePerms[menu] || { Create: false, Edit: false, View: false, "View Any": false, Delete: false };
+      });
+      setPermissions(prev => ({ ...prev, [key]: initialPerms }));
+      setSavedPermissions(prev => ({ ...prev, [key]: JSON.parse(JSON.stringify(initialPerms)) }));
+    } catch (e) {
+      console.error("Failed to fetch permissions", e);
+    }
+  };
+
   useEffect(() => {
     const userStr = sessionStorage.getItem("currentUser");
     if (!userStr) {
@@ -85,94 +105,34 @@ export default function SetRolePermissionPage() {
     const user = JSON.parse(userStr);
     setCurrentUser(user);
     setIsMounted(true);
-    let formattedData = [];
-    try {
-      const storedDepts = localStorage.getItem("doc_tracking_departments");
-      if (storedDepts) {
-        const parsedDepts = JSON.parse(storedDepts);
-        if (Array.isArray(parsedDepts) && parsedDepts.length > 0) {
-          formattedData = parsedDepts.map(d => {
-            const deptRoles = Array.isArray(d.roles)
-              ? d.roles.map(r => r.title || r.type || "Staff")
-              : ["Super Admin", "Admin", "Head of Unit", "Staff"];
-            return {
-              name: d.title,
-              roles: [...new Set(deptRoles)]
-            };
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Failed to parse departments", e);
-    }
 
-    if (formattedData.length === 0) {
-      formattedData = [
-        {
-          name: "IT Center",
-          roles: ["Super Admin", "Admin", "Head of Unit", "Staff"]
-        },
-        {
-          name: "Office of Planning and Finance",
-          roles: ["Super Admin", "Admin", "Head of Unit", "Staff"]
-        },
-        {
-          name: "HR Department",
-          roles: ["Super Admin", "Admin", "Head of Unit", "Staff"]
-        }
-      ];
-    }
-
-    const isGlobal = user?.email === "admin@rupp.edu.kh";
-    const adminCheckStr1 = (user?.type || user?.role || "").toLowerCase();
-    const isDeptAdmin = adminCheckStr1.includes("super admin") || adminCheckStr1 === "admin";
-    if (!isGlobal && isDeptAdmin) {
-      const allowedDept = (user?.department || user?.mainRole || "").toLowerCase().trim();
-      formattedData = formattedData.filter(d => d.name.toLowerCase().trim() === allowedDept);
-      if (formattedData.length === 0) {
-        formattedData = [{
-          name: user?.department || user?.mainRole || "Default Department",
-          roles: ["Super Admin", "Admin", "Head of Unit", "Staff"]
-        }];
-      }
-    }
-
-    setDepartmentsData(formattedData);
-    const newExpanded = {};
-    formattedData.forEach(d => { newExpanded[d.name] = true; });
-    setExpandedDepts(newExpanded);
-
-    let defaultDept = formattedData.length > 0 ? formattedData[0].name : "IT Center";
-    let defaultRole = (formattedData.length > 0 && formattedData[0].roles.length > 0)
-      ? formattedData[0].roles[0]
-      : "Staff";
-    setSelectedRole({ dept: defaultDept, role: defaultRole });
-
-    const storedPerms = localStorage.getItem("doc_tracking_permissions");
-    if (storedPerms) {
+    const loadData = async () => {
       try {
-        const parsed = JSON.parse(storedPerms);
-        setPermissions(parsed);
-        setSavedPermissions(parsed);
-      } catch (e) {
-        console.error("Failed to parse permissions", e);
-      }
-    } else {
-      // Initialize mock permissions matching the default role
-      const mockPerms = {
-        [`${defaultDept}-${defaultRole}`]: {
-          "Request": { Create: true, Edit: true, View: true, "View Any": false, Delete: true },
-          "Receive": { Create: false, Edit: false, View: false, "View Any": false, Delete: false },
-          "Tracking Document": { Create: false, Edit: false, View: false, "View Any": false, Delete: false },
-          "Account": { Create: false, Edit: false, View: false, "View Any": false, Delete: false },
-          "Job Department": { Create: false, Edit: false, View: false, "View Any": false, Delete: false },
-          "Set Role Permission": { Create: false, Edit: false, View: false, "View Any": false, Delete: false },
-          "Type Document": { Create: false, Edit: false, View: false, "View Any": false, Delete: false }
+        const response = await fetch("http://document_tracking_system.test/api/departments");
+        let formattedData = await response.json();
+
+        if (formattedData.length === 0) {
+          formattedData = [];
         }
-      };
-      setPermissions(mockPerms);
-      setSavedPermissions(mockPerms);
-    }
+
+        setDepartmentsData(formattedData);
+        const newExpanded = {};
+        formattedData.forEach(d => { newExpanded[d.name] = true; });
+        setExpandedDepts(newExpanded);
+
+        let defaultDept = formattedData.length > 0 ? formattedData[0].name : "Organization Roles";
+        let defaultRole = (formattedData.length > 0 && formattedData[0].roles.length > 0)
+          ? formattedData[0].roles[0]
+          : "Staff";
+        
+        setSelectedRole({ dept: defaultDept, role: defaultRole });
+        await fetchPermissionsForRole(defaultDept, defaultRole);
+      } catch (e) {
+        console.error("Failed to load departments from API", e);
+      }
+    };
+    
+    loadData();
   }, []);
 
   if (!isMounted) return null;
@@ -185,16 +145,9 @@ export default function SetRolePermissionPage() {
     setExpandedDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }));
   };
 
-  const handleRoleSelect = (dept, role) => {
+  const handleRoleSelect = async (dept, role) => {
     setSelectedRole({ dept, role });
-    const key = `${dept}-${role}`;
-    if (!permissions[key]) {
-      const initialPerms = {};
-      menus.forEach(menu => {
-        initialPerms[menu] = { Create: false, Edit: false, View: false, "View Any": false, Delete: false };
-      });
-      setPermissions(prev => ({ ...prev, [key]: initialPerms }));
-    }
+    await fetchPermissionsForRole(dept, role);
   };
 
   const togglePermission = (menu, action) => {
@@ -302,11 +255,33 @@ export default function SetRolePermissionPage() {
     }));
   };
 
-  const handleSave = () => {
-    localStorage.setItem("doc_tracking_permissions", JSON.stringify(permissions));
-    setSavedPermissions(JSON.parse(JSON.stringify(permissions)));
-    setHasChanges(false);
-    showAlert(t('permissions_saved'));
+  const handleSave = async () => {
+    const key = `${selectedRole.dept}-${selectedRole.role}`;
+    const rolePerms = permissions[key];
+
+    try {
+      const response = await fetch(`http://document_tracking_system.test/api/permissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ 
+          permissions: rolePerms,
+          department: selectedRole.dept,
+          type: selectedRole.role
+        })
+      });
+      
+      if (response.ok) {
+        window.dispatchEvent(new Event("permissions_updated"));
+        setSavedPermissions(JSON.parse(JSON.stringify(permissions)));
+        setHasChanges(false);
+        showAlert(t('permissions_saved'));
+      } else {
+        alert("Failed to save permissions to server.");
+      }
+    } catch (e) {
+      console.error("Failed to save", e);
+      alert("Error saving permissions.");
+    }
   };
 
   return (
@@ -569,7 +544,7 @@ export default function SetRolePermissionPage() {
                                             <MenuIcon size={15} />
                                           </div>
                                           <span className="text-slate-800 dark:text-slate-200 font-medium text-[13.5px]">
-                                            {t(menu === "Request" ? "create_request" : menu === "Receive" ? "received" : menu === "Tracking Document" ? "tracking" : menu === "Account" ? "account" : menu === "Job Department" ? "job_department" : menu === "Set Role Permission" ? "set_role_permission" : menu === "Type Document" ? "type_document" : menu)}
+                                            {t(menu === "Request" ? "create_request" : menu === "Receive" ? "received" : menu === "Tracking Document" ? "tracking" : menu === "Type Document" ? "type_document" : menu === "Account" ? "account" : menu === "Job Department" ? "job_department" : menu === "Set Role Permission" ? "set_role_permission"  : menu === "History Request" ? "history_request" : menu)}
                                           </span>
                                         </div>
                                       </td>

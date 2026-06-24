@@ -49,6 +49,7 @@ export default function Sidebar({
     };
   });
   const [receiveCount, setReceiveCount] = useState(0);
+  const [permissionsVersion, setPermissionsVersion] = useState(0);
 
   const toggleMenu = (menu) => {
     setOpenMenus((prev) => {
@@ -116,6 +117,13 @@ export default function Sidebar({
       if (e.key === "doc_tracking_requests") {
         calculateUnreadReceive(e.newValue);
       }
+      if (e.key === "doc_tracking_permissions") {
+        setPermissionsVersion(v => v + 1);
+      }
+    };
+    
+    const handlePermissionsUpdate = () => {
+      setPermissionsVersion(v => v + 1);
     };
 
     const interval = setInterval(() => {
@@ -123,8 +131,10 @@ export default function Sidebar({
     }, 1000);
 
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("permissions_updated", handlePermissionsUpdate);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("permissions_updated", handlePermissionsUpdate);
       clearInterval(interval);
     };
   }, [currentUser]);
@@ -203,7 +213,7 @@ export default function Sidebar({
           {/* Notification Badges */}
           {item.name === "Receive" && receiveCount > 0 && (
             isSidebarOpen ? (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[20px]">
+              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[20px]">
                 {receiveCount > 99 ? '99+' : receiveCount}
               </span>
             ) : (
@@ -252,7 +262,7 @@ export default function Sidebar({
         >
           <div className="flex items-center gap-3.5">
             <ShieldCheck size={18} className="text-gray-400 flex-shrink-0" />
-            <span>Role & Permission</span>
+            <span>{t("role & permission")}</span>
           </div>
           <ChevronDown size={16} className={`text-gray-400 transition-transform duration-300 ${isExpanded ? "rotate-180" : "rotate-0"}`} />
         </button>

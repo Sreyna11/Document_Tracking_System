@@ -10,6 +10,20 @@ const getEnglishName = (name) => {
   return name.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim();
 };
 
+const getLocalizedName = (name, language) => {
+  if (!name) return "";
+  if (language === 'km') {
+    const khmerPart = name.match(/[\u1780-\u17FF\u19E0-\u19FF]+/g);
+    if (khmerPart && khmerPart.length > 0) {
+      return khmerPart.join(' ').trim();
+    }
+    return name.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim() || name;
+  } else {
+    const enPart = name.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim();
+    return enPart || name;
+  }
+};
+
 export default function Navbar({
   isSidebarOpen,
   setIsSidebarOpen,
@@ -143,8 +157,8 @@ export default function Navbar({
             (userDept === "inventory" && target.includes("inventory"));
         });
 
-        // Set notifications list sorted descending (newest first)
-        const sortedNotifs = [...myNotifs].reverse();
+        // Set notifications list (newest first as they are unshifted into storage)
+        const sortedNotifs = [...myNotifs];
         setNotifications(sortedNotifs);
 
         const oldNotifs = previousNotifsRef.current;
@@ -183,9 +197,15 @@ export default function Navbar({
 
   const getSenderPhoto = (senderName) => {
     if (!senderName || users.length === 0) return null;
+    const sName = getEnglishName(senderName).toLowerCase().trim();
     const match = users.find(
-      (u) => (`${u.firstName} ${u.lastName}`).toLowerCase().trim() === senderName.toLowerCase().trim() ||
-        (u.username || "").toLowerCase().trim() === senderName.toLowerCase().trim()
+      (u) => {
+        const uFirstLast = getEnglishName(`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim();
+        const uUser = getEnglishName(u.username || "").toLowerCase().trim();
+        return uFirstLast === sName || uUser === sName || 
+               (`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim() === senderName.toLowerCase().trim() ||
+               (u.username || "").toLowerCase().trim() === senderName.toLowerCase().trim();
+      }
     );
     return match ? match.profilePhoto : null;
   };
@@ -240,7 +260,7 @@ export default function Navbar({
         )}
         {currentUser && (
           <span className="hidden sm:block text-[14px] font-extrabold text-slate-800 dark:text-gray-200 tracking-wide uppercase ml-1">
-            {currentUser.department || currentUser.mainRole || "N/A"}
+            {(currentUser.department || currentUser.mainRole || "").toLowerCase() === "global" ? "System Admin" : (currentUser.department || currentUser.mainRole || "N/A")}
           </span>
         )}
       </div>
@@ -321,7 +341,9 @@ export default function Navbar({
                             if (!notif.read) markAsRead(notif.id);
                             setIsNotifOpen(false);
                             if (notif.requestId) {
-                              router.push(`/content/receive?id=${notif.requestId}`);
+                              router.push(`/content/receive?reqId=${notif.requestId}`);
+                            } else {
+                              router.push(`/content/receive`);
                             }
                           }}
                           className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-200 cursor-pointer hover:shadow-xs group/item ${
@@ -340,7 +362,7 @@ export default function Navbar({
                               />
                             ) : (
                               <div className="w-9 h-9 rounded-full border border-gray-200 dark:border-[#2A2F3A] shadow-2xs flex-shrink-0 flex items-center justify-center bg-gray-100 dark:bg-[#0B0D12] overflow-hidden text-gray-500 dark:text-[#a1a1aa] font-bold text-sm uppercase">
-                                {notif.senderName ? notif.senderName.charAt(0) : "U"}
+                                {notif.senderName ? getLocalizedName(notif.senderName, language).charAt(0) : "U"}
                               </div>
                             )}
                           </div>
@@ -349,7 +371,7 @@ export default function Navbar({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
                               <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200 truncate max-w-[120px] sm:max-w-[160px]">
-                                {notif.senderName}
+                                {getLocalizedName(notif.senderName, language)}
                               </span>
                               <div className="flex items-center gap-1.5 flex-shrink-0">
                                 {notif.priorityLevel && (

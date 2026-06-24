@@ -14,7 +14,7 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, it
         <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Confirmation</h3>
         
         <p className="text-gray-500 text-[15px] mb-8 px-2 font-medium">
-          Are you sure you want to delete {itemCount > 1 ? `${itemCount} selected ${itemType}` : <span className="font-bold text-gray-700">{itemName}</span>}?
+          Are you sure you want to delete {itemName && String(itemName).trim() !== '' ? <span className="font-bold text-gray-700">{itemName}</span> : `${itemCount} ${itemCount === 1 ? itemType.replace(/s$/, '') : `selected ${itemType}`}`}?
         </p>
         <div className="flex gap-3 justify-center">
           <button

@@ -24,12 +24,16 @@ import {
     Download,
     DownloadCloud,
     UploadCloud,
-    Trash2
+    Trash2,
+    Plus
 } from "lucide-react";
 import AlertModal from "../../../components/AlertModal";
 import BulkActionBar from "../../../components/BulkActionBar";
 import { useLanguage } from "../../context/LanguageContext";
 import { useSidebar } from "../../context/SidebarContext";
+import { hasPermission } from "../../../utils/permissions";
+import SearchableSelect from "@/components/SearchableSelect";
+import CustomSelect from "@/components/CustomSelect";
 import Pagination from "../../../components/Pagination";
 import DeleteConfirmationModal from "../../../components/DeleteConfirmationModal";
 export default function ReceivedPage() {
@@ -81,6 +85,7 @@ export default function ReceivedPage() {
             );
             setRequests(updatedRequests);
             localStorage.setItem("doc_tracking_requests", JSON.stringify(updatedRequests));
+            window.dispatchEvent(new Event("requests_updated"));
             if (improveFileInputRef.current) improveFileInputRef.current.value = "";
         };
         reader.readAsDataURL(file);
@@ -120,6 +125,8 @@ export default function ReceivedPage() {
     const [editDescription, setEditDescription] = useState("");
     // Page-level comment state (replaces modal textareas)
     const [pageComment, setPageComment] = useState("");
+    const [departments, setDepartments] = useState([]);
+    const [forwardToDept, setForwardToDept] = useState("");
     // Alert Modal State
     const [alertModal, setAlertModal] = useState({ isOpen: false, message: "" });
     const showAlert = (message) => setAlertModal({ isOpen: true, message });
@@ -259,6 +266,16 @@ export default function ReceivedPage() {
             } catch (e) {
                 console.error("Error loading main roles", e);
             }
+            // Load departments from localStorage for forwarding
+            try {
+                const storedDepts = localStorage.getItem("doc_tracking_departments");
+                if (storedDepts) {
+                    const parsedDepts = JSON.parse(storedDepts);
+                    setDepartments(Array.isArray(parsedDepts) ? parsedDepts : []);
+                }
+            } catch (e) {
+                console.error("Error loading departments", e);
+            }
         }
         // Real-time tracking without refresh
         const handleStorageChange = (e) => {
@@ -275,25 +292,57 @@ export default function ReceivedPage() {
                 }
             }
         };
+        const handleRequestsUpdated = () => {
+            try {
+                const stored = localStorage.getItem("doc_tracking_requests");
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    setRequests(Array.isArray(parsed) ? parsed : []);
+                } else {
+                    setRequests([]);
+                }
+            } catch (error) {
+                console.error("Error parsing real-time requests update:", error);
+            }
+        };
         window.addEventListener("storage", handleStorageChange);
+        window.addEventListener("requests_updated", handleRequestsUpdated);
         return () => {
             window.removeEventListener("storage", handleStorageChange);
+            window.removeEventListener("requests_updated", handleRequestsUpdated);
         };
     }, []);
     // Filter requests based on logged in user's mainRole department and search term
     useEffect(() => {
         if (!currentUser) return;
-        const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+        const userDept = (currentUser.department || currentUser.mainRole || "").toLowerCase().trim();
         const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
+        const canViewAny = hasPermission(currentUser, "Receive", "View Any");
         let list = requests.filter((req) => {
-            const isAssignedToMeForImprovement = req.status?.toLowerCase().trim() === "assigned to improve" && (req.improveAssignedTo || "").toLowerCase().trim() === userDept;
+            if (isGlobalSuperAdmin) return true;
+            const currentUserName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim().toLowerCase();
+            const senderName = (req.senderName || "").trim().toLowerCase();
+            const senderEmail = (req.senderEmail || "").trim().toLowerCase();
+            const myEmail = (currentUser?.email || "").trim().toLowerCase();
+            const isExactSender = (senderName === currentUserName || senderName === (currentUser?.username || "").trim().toLowerCase()) || (senderEmail && myEmail && senderEmail === myEmail);
+
+            const isAssignedToMeForImprovement = req.status?.toLowerCase().trim() === "assigned to improve" && isExactSender;
             if (isAssignedToMeForImprovement) return true;
-            const isDeclinedToMe = req.status?.toLowerCase().trim() === "failed" && (req.senderDepartment || "").toLowerCase().trim() === userDept;
+            const isDeclinedToMe = req.status?.toLowerCase().trim() === "failed" && isExactSender;
             if (isDeclinedToMe) return true;
-            const isCompletedToMe = req.status?.toLowerCase().trim() === "completed" && (req.senderDepartment || "").toLowerCase().trim() === userDept;
+            const isCompletedToMe = req.status?.toLowerCase().trim() === "completed" && isExactSender;
             if (isCompletedToMe) return true;
-            // The sender doesn't have data in receive, unless get return or decline
-            if ((req.senderDepartment || "").toLowerCase().trim() === userDept) return false;
+            
+            let isCurrentApprover = false;
+            if (req.path && req.path[req.currentStepIndex || 0]) {
+                const currentApproverSign = (req.path[req.currentStepIndex || 0].userSign || "").toLowerCase();
+                const englishSignName = currentApproverSign.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim();
+                isCurrentApprover = (englishSignName === currentUserName) || (englishSignName === (currentUser?.username || "").toLowerCase().trim());
+            }
+
+            if (isExactSender && !isCurrentApprover && req.status !== "failed" && req.status !== "assigned to improve" && req.status !== "completed") {
+                return false;
+            }
             if (isGlobalSuperAdmin) return true; // Global super admin sees all OTHERS
             if (!req.path) return false;
             const myIndex = req.path.findIndex(p => {
@@ -301,6 +350,18 @@ export default function ReceivedPage() {
                 return role && role.toLowerCase().trim() === userDept;
             });
             if (myIndex === -1) return false;
+            
+            if (!canViewAny) {
+                const step = req.path[myIndex];
+                if (step && step.assignedTo) {
+                    const assignedEmail = (step.assignedTo.email || "").toLowerCase().trim();
+                    const myEmail = (currentUser?.email || "").toLowerCase().trim();
+                    if (assignedEmail && myEmail && assignedEmail !== myEmail) {
+                        return false;
+                    }
+                }
+            }
+
             const currentIndex = req.currentStepIndex !== undefined ? req.currentStepIndex : 0;
             return currentIndex >= myIndex;
         });
@@ -322,7 +383,7 @@ export default function ReceivedPage() {
     const handleSelectRequest = (req) => {
         setSelectedRequest(req);
         if (!currentUser) return;
-        const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+        const userDept = (currentUser.department || currentUser.mainRole || "").toLowerCase().trim();
         let updatedReq = { ...req };
         let changed = false;
         const readBy = req.readBy || [];
@@ -348,6 +409,7 @@ export default function ReceivedPage() {
             const list = requests.map(r => r.id === req.id ? updatedReq : r);
             setRequests(list);
             localStorage.setItem("doc_tracking_requests", JSON.stringify(list));
+            window.dispatchEvent(new Event("requests_updated"));
             setSelectedRequest(updatedReq);
         }
     };
@@ -435,7 +497,7 @@ export default function ReceivedPage() {
         if (!userName || usersList.length === 0) return null;
         const target = getEnglishName(userName).toLowerCase().trim();
         if (!target) return null;
-        return usersList.find(u => {
+        const matchedByName = usersList.find(u => {
             const fName = getEnglishName(`${u.firstName || ""} ${u.lastName || ""}`).toLowerCase().trim();
             const uName = getEnglishName(u.username || u.name || "").toLowerCase().trim();
             if (fName === target || uName === target) return true;
@@ -443,7 +505,11 @@ export default function ReceivedPage() {
             const fNameParts = fName.split(' ');
             const uNameParts = uName.split(' ');
             return fNameParts.includes(target) || uNameParts.includes(target);
-        }) || null;
+        });
+        
+        if (matchedByName) return matchedByName;
+        
+        return usersList.find(u => (u.department || u.mainRole || "").toLowerCase().trim() === target) || null;
     };
     const getFileFromIndexedDB = (id) => {
         return new Promise((resolve) => {
@@ -480,6 +546,41 @@ export default function ReceivedPage() {
         const list = requests.map(req => req.id === updatedRequest.id ? updatedRequest : req);
         setRequests(list);
         localStorage.setItem("doc_tracking_requests", JSON.stringify(list));
+        window.dispatchEvent(new Event("requests_updated"));
+    };
+
+    const handleFileAdded = (e) => {
+        const files = Array.from(e.target.files);
+        if (!files || files.length === 0 || !selectedRequest) return;
+
+        const newFilesPromises = files.map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        dataUrl: reader.result,
+                        addedBy: userDept,
+                        addedAt: new Date().toISOString()
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        Promise.all(newFilesPromises).then(newFiles => {
+            const updatedFiles = [...(selectedRequest.files || []), ...newFiles];
+            const updatedRequest = { ...selectedRequest, files: updatedFiles };
+            
+            setSelectedRequest(updatedRequest);
+            
+            const list = requests.map(req => req.id === updatedRequest.id ? updatedRequest : req);
+            setRequests(list);
+            localStorage.setItem("doc_tracking_requests", JSON.stringify(list));
+            window.dispatchEvent(new Event("requests_updated"));
+        });
     };
     const handleDownload = async (e, fileToDownload) => {
         if (e) e.stopPropagation();
@@ -554,6 +655,7 @@ export default function ReceivedPage() {
     const updateRequestsList = (updatedList, msg) => {
         setRequests(updatedList);
         localStorage.setItem("doc_tracking_requests", JSON.stringify(updatedList));
+        window.dispatchEvent(new Event("requests_updated"));
 
         if (selectedRequest) {
             const updatedReq = updatedList.find(r => r.id === selectedRequest.id);
@@ -641,6 +743,7 @@ export default function ReceivedPage() {
         });
         setRequests(list);
         localStorage.setItem("doc_tracking_requests", JSON.stringify(list));
+        window.dispatchEvent(new Event("requests_updated"));
         setSuccessMessage(`Document assigned to ${assigneeObj.firstName ? assigneeObj.firstName : assigneeObj.username}!`);
         setShowSuccessAlert(true);
         setShowAssignModal(false);
@@ -683,7 +786,7 @@ export default function ReceivedPage() {
                 id: Date.now().toString(),
                 requestId: selectedRequest.id,
                 targetDepartment: selectedRequest.senderDepartment || "global",
-                senderName: currentUser ? getEnglishName(currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
+                senderName: currentUser ? (currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
                 senderDepartment: actorDept,
                 subject: `Document Approved: ${selectedRequest.title || selectedRequest.subject || selectedRequest.documentType}`,
                 details: (isLast ? "Your document has been fully approved." : "Your document has been approved and moved to the next step.") + (comment ? `\nComment: ${comment}` : ""),
@@ -701,7 +804,7 @@ export default function ReceivedPage() {
                     id: (Date.now() + 1).toString(),
                     requestId: selectedRequest.id,
                     targetDepartment: nextDept,
-                    senderName: currentUser ? getEnglishName(currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
+                    senderName: currentUser ? (currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
                     senderDepartment: actorDept,
                     subject: `New Request Routed: ${selectedRequest.title || selectedRequest.subject || selectedRequest.documentType}`,
                     details: `A document has been approved by ${actorDept} and routed to you for review.` + (comment ? `\nComment: ${comment}` : ""),
@@ -720,6 +823,69 @@ export default function ReceivedPage() {
         updateRequestsList(list, msg);
         setShowApproveModal(false);
     };
+    
+    const handleForwardClick = () => {
+        if (!forwardToDept) {
+            showAlert("Please select a department to forward to.");
+            return;
+        }
+        if (!selectedRequest) return;
+        const actorDept = currentUser?.department || currentUser?.mainRole || "Department";
+        const list = requests.map(req => {
+            if (req.id === selectedRequest.id) {
+                const currentIndex = req.currentStepIndex !== undefined ? req.currentStepIndex : 0;
+                let updatedFiles = req.files || [];
+                if (editedFile) updatedFiles = [editedFile, ...updatedFiles];
+                
+                const newPath = req.path ? [...req.path] : [];
+                // Mark current step as approved
+                if (newPath[currentIndex]) {
+                    newPath[currentIndex] = { 
+                        ...newPath[currentIndex], 
+                        approvedAt: new Date().toISOString(), 
+                        comment: `Forwarded to ${forwardToDept}` 
+                    };
+                }
+                
+                // Add new step
+                newPath.push({
+                    department: forwardToDept,
+                    status: "Pending"
+                });
+                
+                return { ...req, path: newPath, currentStepIndex: currentIndex + 1, files: updatedFiles, status: "In Progress" };
+            }
+            return req;
+        });
+
+        // Add Notification logic
+        try {
+            const storedNotifs = localStorage.getItem("doc_tracking_notifications");
+            const allNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
+            const newNotif = {
+                id: Date.now().toString(),
+                requestId: selectedRequest.id,
+                targetDepartment: forwardToDept,
+                senderName: currentUser ? (currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
+                senderDepartment: actorDept,
+                subject: `Forwarded Request: ${selectedRequest.title || selectedRequest.subject || selectedRequest.documentType}`,
+                details: `A custom request has been forwarded to you for review.`,
+                date: new Date().toISOString().split('T')[0],
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                read: false
+            };
+            allNotifs.unshift(newNotif);
+            localStorage.setItem("doc_tracking_notifications", JSON.stringify(allNotifs));
+            window.dispatchEvent(new Event("storage"));
+            window.dispatchEvent(new Event("notifications_updated"));
+        } catch (e) {
+            console.error("Error creating notification", e);
+        }
+
+        updateRequestsList(list, "Document forwarded to " + forwardToDept);
+        setForwardToDept("");
+    };
+
     const confirmApprove = () => {
         if (!signatureData) { showAlert("Please provide a signature to approve this request."); return; }
         executeApprove(signatureData);
@@ -756,7 +922,7 @@ export default function ReceivedPage() {
                 id: Date.now().toString(),
                 requestId: selectedRequest.id,
                 targetDepartment: selectedRequest.senderDepartment || "global",
-                senderName: currentUser ? getEnglishName(currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
+                senderName: currentUser ? (currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
                 senderDepartment: actorDept,
                 subject: `Document Declined: ${selectedRequest.title || selectedRequest.subject || selectedRequest.documentType}`,
                 details: `Reason: ${reason.trim()}`,
@@ -819,7 +985,7 @@ export default function ReceivedPage() {
                 id: Date.now().toString(),
                 requestId: selectedRequest.id,
                 targetDepartment: selectedRequest.senderDepartment || "global",
-                senderName: currentUser ? getEnglishName(currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
+                senderName: currentUser ? (currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username) : "Unknown",
                 senderDepartment: actorDept,
                 subject: `Document Returned for Improvement: ${selectedRequest.title || selectedRequest.subject || selectedRequest.documentType}`,
                 details: `Reason: ${reason.trim()}`,
@@ -860,6 +1026,7 @@ export default function ReceivedPage() {
         const list = requests.map(req => req.id === selectedRequest.id ? updatedRequest : req);
         setRequests(list);
         localStorage.setItem("doc_tracking_requests", JSON.stringify(list));
+        window.dispatchEvent(new Event("requests_updated"));
         setSelectedRequest(updatedRequest);
         setShowEditModal(false);
         setSuccessMessage("Request updated successfully.");
@@ -902,7 +1069,7 @@ export default function ReceivedPage() {
     const isImage = ["png", "jpg", "jpeg", "gif"].includes(ext);
     const isPdf = ext === "pdf";
     const isDocx = ext === "docx";
-    const userDept = (currentUser?.mainRole || currentUser?.department || "").toLowerCase().trim();
+    const userDept = (currentUser?.department || currentUser?.mainRole || "").toLowerCase().trim();
     // Helper to group requests by date
     const getGroupedRequests = (requests) => {
         const groups = {
@@ -933,7 +1100,12 @@ export default function ReceivedPage() {
     const isMyDepartmentTurn = selectedRequest && isStatusInProgress && ((currentReviewerRole && currentReviewerRole.toLowerCase().trim() === userDept) || (!currentReviewerRole && (userDept === "acc" || userDept === "inventory" || userDept === "itc")));
     const hasAssignee = !!currentStepData?.assignedTo;
     const isAssignedToMe = currentStepData?.assignedTo?.email?.toLowerCase().trim() === (currentUser?.email || "").toLowerCase().trim();
-    const isManager = currentUser && (currentUser.role === "Admin" || currentUser.role === "Super Admin" || currentUser.role === "Super Admin" || sessionStorage.getItem("isAdminAuthenticated") === "true");
+    const isManager = currentUser && (
+        (currentUser.role || "").toLowerCase() === "admin" || 
+        (currentUser.role || "").toLowerCase() === "super admin" || 
+        (currentUser.role || "").toLowerCase() === "department head" || 
+        sessionStorage.getItem("isAdminAuthenticated") === "true"
+    );
     const isMyTurn = isMyDepartmentTurn && (!hasAssignee || isAssignedToMe);
     return (
         <div className="flex min-h-screen bg-[#fafafb] dark:bg-[#0F1117] text-black dark:text-white">
@@ -950,22 +1122,23 @@ export default function ReceivedPage() {
                 {/* Modals here... */}
                 {showReturnModal && (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs select-none animate-fade-in">
-                        <div className="w-full max-w-[600px] bg-white dark:bg-[#161B22] p-6 shadow-2xl flex flex-col border border-gray-100">
+                        <div className="w-full max-w-[420px] bg-white dark:bg-[#161B22] rounded-3xl p-6 text-center shadow-2xl border border-gray-50 flex flex-col items-center">
                             <div className="flex items-center justify-between w-full mb-4">
-                                <h3 className="text-2xl font-bold text-gray-900 font-serif">Reason of document return</h3>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowReturnModal(false)} className="px-6 py-1.5 bg-[#ff0000] text-white font-bold text-sm cursor-pointer shadow-sm rounded-sm hover:opacity-90">Cancel</button>
-                                    <button onClick={confirmReturn} className="px-6 py-1.5 bg-[#008000] text-white font-bold text-sm cursor-pointer shadow-sm rounded-sm hover:opacity-90">Save</button>
-                                </div>
+                                <h3 className="text-xl font-bold text-gray-900">Reason of document return</h3>
+                                <button onClick={() => setShowReturnModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
                             </div>
-                            <div className="w-full">
+                            <div className="mb-4 w-full">
                                 <textarea
-                                    rows={8}
+                                    rows={4}
                                     placeholder="Write Something..."
                                     value={returnReason}
                                     onChange={(e) => setReturnReason(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none text-[14px] bg-[#f0f0f0] text-gray-800 font-medium resize-none shadow-inner focus:border-green-500"
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#dcb04d] outline-none text-[13px] bg-white text-black font-semibold resize-none mb-5"
                                 />
+                            </div>
+                            <div className="flex items-center gap-3 w-full">
+                                <button onClick={() => setShowReturnModal(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer">Cancel</button>
+                                <button onClick={confirmReturn} className="flex-1 py-3 bg-[#dcb04d] hover:bg-[#c99f43] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm">Confirm Return</button>
                             </div>
                         </div>
                     </div>
@@ -1002,20 +1175,23 @@ export default function ReceivedPage() {
                             </div>
                             <div className="mb-6 w-full">
                                 <label className="block text-sm font-bold text-gray-700 mb-2">Select Department Member</label>
-                                <select
+                                <CustomSelect
                                     value={selectedAssignee}
                                     onChange={(e) => setSelectedAssignee(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none text-[13px] bg-white text-black font-semibold"
-                                >
-                                    <option value="">-- Select Member --</option>
-                                    {usersList
-                                        .filter(u => ((u.department || u.mainRole || "ITC") === userDept || (u.department || u.mainRole || "ITC").toLowerCase().trim() === userDept) && (u.role || "").toLowerCase().trim() !== "super admin")
-                                        .map(u => (
-                                            <option key={u.id || u.email} value={JSON.stringify(u)}>
-                                                {u.firstName ? `${u.lastName} ${u.firstName}` : u.username} ({u.email})
-                                            </option>
-                                        ))}
-                                </select>
+                                    placeholder={t("select_member") || "Select member..."}
+                                    searchable={true}
+                                    searchPlaceholder={t("search_member") || "Search member..."}
+                                    options={usersList
+                                        .filter(u => ((u.department || u.mainRole || "ITC") === userDept || (u.department || u.mainRole || "ITC").toLowerCase().trim() === userDept) && (u.role || "").toLowerCase().trim() !== "super admin" && u.email !== currentUser?.email)
+                                        .map(u => {
+                                            const rawName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.username;
+                                            const engName = rawName.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim() || rawName;
+                                            return {
+                                                value: JSON.stringify({ name: rawName, email: u.email }),
+                                                label: `${engName} (${u.email})`
+                                            };
+                                        })}
+                                />
                             </div>
                             <div className="flex items-center gap-3 w-full">
                                 <button onClick={() => setShowAssignModal(false)} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer">Cancel</button>
@@ -1133,17 +1309,47 @@ export default function ReceivedPage() {
                         {selectedRequest && (
                             <div className="flex items-center justify-start w-full bg-[#fdfdfd] dark:bg-[#0F1117] border border-gray-100 dark:border-[#2A2F3A] rounded-xl p-4 shadow-sm mb-6 overflow-x-auto">
                                 <div className="flex items-center space-x-1 min-w-max">
+                                    {/* Sender Node */}
+                                    {(() => {
+                                        const senderNodeUser = getNodeUserInfo(selectedRequest?.senderName);
+                                        const displaySenderPhoto = selectedRequest?.senderPhoto || (senderNodeUser ? (senderNodeUser.profilePhoto || senderNodeUser.photo) : null);
+                                        return (
+                                            <div className="flex items-center">
+                                                <div className="flex items-center gap-3 bg-[#f8fcf8] dark:bg-[#161B22] border border-[#008000] dark:border-[#008000] rounded-lg p-2.5 shadow-xs min-w-[240px] z-10 relative">
+                                                    {displaySenderPhoto ? (
+                                                        <div className="w-12 h-12 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-white dark:bg-[#242B36] p-0.5 flex-shrink-0">
+                                                            <img src={displaySenderPhoto} className="w-full h-full rounded-md object-cover object-top" alt={selectedRequest?.senderName} />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-12 h-12 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-white dark:bg-[#242B36] flex flex-col items-center justify-end flex-shrink-0 overflow-hidden">
+                                                            <div className="w-[18px] h-[18px] bg-gray-300 dark:bg-gray-600 rounded-full mb-1 shrink-0"></div>
+                                                            <div className="w-[38px] h-[38px] bg-gray-300 dark:bg-gray-600 rounded-full -mb-[19px] shrink-0"></div>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-col leading-[1.35]">
+                                                        <div className="text-[12px] text-gray-800 dark:text-gray-200">
+                                                            <span className="font-bold">Request By : </span>
+                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{getEnglishName(selectedRequest?.senderName || 'Unknown')}</span>
+                                                        </div>
+                                                        <span className="text-[11.5px] font-medium text-gray-500 mt-0.5">Dept : {selectedRequest?.senderDepartment || 'Unknown'}</span>
+                                                        <span className="text-[11.5px] font-medium text-gray-500 mt-0.5">Role : {senderNodeUser ? (senderNodeUser.role || selectedRequest?.senderRole || 'Staff') : (selectedRequest?.senderRole || 'Staff')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                     {/* Path Nodes */}
                                     {selectedRequest.path && selectedRequest.path.length > 0 && selectedRequest.path.map((step, idx) => {
                                         const isApproved = (selectedRequest.currentStepIndex || 0) > idx || selectedRequest.status === "Completed";
                                         const isCurrent = (selectedRequest.currentStepIndex || 0) === idx && selectedRequest.status !== "Completed";
                                         const isFailed = selectedRequest.status === "Failed" && idx === (selectedRequest.currentStepIndex || 0);
                                         const isReturned = selectedRequest.status === "Assigned to Improve" && idx === (selectedRequest.currentStepIndex || 0);
+                                        const isForwarded = isApproved && step.comment && step.comment.startsWith("Forwarded to");
                                         const roleName = getRoleString(step);
                                         let stepDept = roleName;
                                         let stepUser = roleName;
                                         let stepRole = "Approver";
-                                        let label = idx === 0 ? 'Request By' : isApproved ? 'Approved By' : isFailed ? 'Declined By' : isReturned ? 'Returned By' : isCurrent ? 'Pending At' : 'Next Approver';
+                                        let label = isForwarded ? 'Sent By' : isApproved ? 'Approved By' : isFailed ? 'Declined By' : isReturned ? 'Returned By' : isCurrent ? 'Pending At' : 'Next Approver';
                                         if (typeof step === 'object' && step !== null) {
                                             stepDept = step.department || step.mainRole || roleName;
                                             if (step.assignedTo) {
@@ -1156,22 +1362,24 @@ export default function ReceivedPage() {
                                         }
                                         const nodeUser = getNodeUserInfo(stepUser);
                                         if (nodeUser) {
-                                            stepRole = nodeUser.role || nodeUser.mainRole || stepRole;
+                                            if (stepUser !== "Pending" && stepUser !== "Unknown" && stepUser !== stepDept) {
+                                                stepRole = nodeUser.role || "Staff";
+                                            } else {
+                                                stepRole = nodeUser.role || stepRole;
+                                            }
                                         }
                                         const nodePhoto = nodeUser ? (nodeUser.profilePhoto || nodeUser.photo) : null;
-                                        const isLeftApproved = idx > 0 && ((selectedRequest.currentStepIndex || 0) > idx - 1 || selectedRequest.status === "Completed");
+                                        const isLeftApproved = idx === 0 || (idx > 0 && ((selectedRequest.currentStepIndex || 0) > idx - 1 || selectedRequest.status === "Completed"));
                                         const leftColor = isLeftApproved ? 'bg-[#008000]' : 'bg-gray-500';
-                                        const lineColor = isApproved ? 'border-[#008000]' : isFailed ? 'border-red-500' : isReturned ? 'border-purple-500' : 'border-gray-400';
+                                        const lineColor = (idx === 0 || isApproved) ? 'border-[#008000]' : isFailed ? 'border-red-500' : isReturned ? 'border-purple-500' : 'border-gray-400';
                                         const rightColor = isApproved ? 'bg-[#008000]' : isFailed ? 'bg-red-500' : isReturned ? 'bg-purple-500' : isCurrent ? 'bg-[#ffb200]' : 'bg-gray-500';
                                         return (
                                             <div key={idx} className="flex items-center">
-                                                {idx > 0 && (
-                                                    <div className="flex items-center w-20 justify-between relative z-20 -ml-1.5">
-                                                        <div className={`w-4 h-4 rounded-full relative z-10 shrink-0 ${leftColor}`}></div>
-                                                        <div className={`absolute left-0 right-0 border-b-[1.5px] ${lineColor}`}></div>
-                                                        <div className={`w-4 h-4 rounded-full relative z-10 shrink-0 ${rightColor}`}></div>
-                                                    </div>
-                                                )}
+                                                <div className="flex items-center w-20 justify-between relative z-20 -ml-1.5">
+                                                    <div className={`w-4 h-4 rounded-full relative z-10 shrink-0 ${leftColor}`}></div>
+                                                    <div className={`absolute left-0 right-0 border-b-[1.5px] ${lineColor}`}></div>
+                                                    <div className={`w-4 h-4 rounded-full relative z-10 shrink-0 ${rightColor}`}></div>
+                                                </div>
                                                 <div className="flex items-center gap-3 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-2.5 shadow-xs min-w-[240px] z-10 relative">
                                                     {nodePhoto ? (
                                                         <div className="w-12 h-12 rounded-lg border border-gray-200 dark:border-[#2A2F3A] bg-white dark:bg-[#242B36] p-0.5 flex-shrink-0">
@@ -1248,7 +1456,7 @@ export default function ReceivedPage() {
                                                                     badgeText = `Assigned to ${getEnglishName(pendingDeptObj.assignedTo.name).split(' ')[0]}`;
                                                                     badgeColor = "text-blue-600 dark:text-blue-400";
                                                                 } else {
-                                                                    badgeText = `Pending ${pendingDept}`;
+                                                                    badgeText = "Pending";
                                                                     badgeColor = "text-yellow-600 dark:text-yellow-500";
                                                                 }
                                                             } else if (req.status === "Assigned to Improve") {
@@ -1258,7 +1466,7 @@ export default function ReceivedPage() {
                                                                 badgeText = "Rejected";
                                                                 badgeColor = "text-red-500";
                                                             } else if (req.status === "Completed") {
-                                                                badgeText = "Approved";
+                                                                badgeText = isSender ? "Get Approved" : "Approved";
                                                                 badgeColor = "text-green-600 dark:text-green-400";
                                                             }
                                                             return (
@@ -1277,7 +1485,7 @@ export default function ReceivedPage() {
                                                                         )}
                                                                         <div className="flex flex-col overflow-hidden w-full">
                                                                             <span className="text-[13px] font-bold text-gray-900 dark:text-gray-100 uppercase truncate">{getDisplaySenderName(req)}</span>
-                                                                            <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">{req.documentType ? ((req.title || req.subject) ? `${req.documentType} ~ ${req.title || req.subject}` : req.documentType) : (req.title || req.subject || "")}</span>
+                                                                            <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">{req.title || ""}</span>
                                                                         </div>
                                                                     </div>
                                                                     <span className={`text-[11px] font-medium ${badgeColor} mt-1`}>{badgeText}</span>
@@ -1298,7 +1506,7 @@ export default function ReceivedPage() {
                                     <div className="flex items-start justify-between border-b border-gray-100 dark:border-[#2A2F3A] pb-4">
                                         <div className="flex items-center gap-2">
                                             <FileText size={20} className="text-gray-800 dark:text-gray-200" />
-                                            <h2 className="text-lg font-bold text-gray-800 dark:text-white">{selectedRequest.documentType ? ((selectedRequest.title || selectedRequest.subject) ? `${selectedRequest.documentType} ~ ${selectedRequest.title || selectedRequest.subject}` : selectedRequest.documentType) : (selectedRequest.title || selectedRequest.subject || "Untitled Request")}</h2>
+                                            <h2 className="text-lg font-bold text-gray-800 dark:text-white">{selectedRequest.title || selectedRequest.subject || "Untitled Request"}</h2>
                                         </div>
                                         {/* Always show action buttons for testing or based on user request */}
                                         <div className="flex items-center gap-2">
@@ -1327,12 +1535,16 @@ export default function ReceivedPage() {
                                                         const role = typeof p === 'string' ? p : p.department || p.mainRole;
                                                         return role && role.toLowerCase().trim() === userDept;
                                                     });
-                                                    const isSenderBadge = (selectedRequest.senderDepartment || "").toLowerCase().trim() === userDept || (selectedRequest.senderEmail || "").toLowerCase().trim() === (currentUser?.email || "").toLowerCase().trim();
+                                                    const sEmail = (selectedRequest.senderEmail || "").toLowerCase().trim();
+                                                    const uEmail = (currentUser?.email || "").toLowerCase().trim();
+                                                    const sName = (selectedRequest.senderName || "").toLowerCase().trim();
+                                                    const uName = (currentUser?.username || currentUser?.name || "").toLowerCase().trim();
+                                                    const isSenderBadge = (sEmail && uEmail && sEmail === uEmail) || (sName && uName && sName === uName);
                                                     if (isSenderBadge) {
                                                         if (selectedRequest.status === "Failed") {
                                                             actionText = t("rejected"); bgClass = "bg-red-50 dark:bg-red-900/20"; textClass = "text-red-700 dark:text-red-400"; borderClass = "border-red-200 dark:border-red-800/30";
                                                         } else if (selectedRequest.status === "Completed") {
-                                                            actionText = t("approved"); bgClass = "bg-green-50 dark:bg-green-900/20"; textClass = "text-green-700 dark:text-green-400"; borderClass = "border-green-200 dark:border-green-800/30";
+                                                            actionText = "Get Approved"; bgClass = "bg-green-50 dark:bg-green-900/20"; textClass = "text-green-700 dark:text-green-400"; borderClass = "border-green-200 dark:border-green-800/30";
                                                         } else if (selectedRequest.status === "Assigned to Improve") {
                                                             const pendingDeptObj = selectedRequest.path && selectedRequest.path[selectedRequest.currentStepIndex || 0];
                                                             const pendingDept = pendingDeptObj ? (typeof pendingDeptObj === 'string' ? pendingDeptObj : pendingDeptObj.department || pendingDeptObj.mainRole) : "Unknown";
@@ -1342,19 +1554,25 @@ export default function ReceivedPage() {
                                                         }
                                                     } else if (myIdx !== -1 && myIdx !== undefined) {
                                                         const currIdx = selectedRequest.currentStepIndex || 0;
+                                                        const isForwarded = selectedRequest.path[myIdx]?.comment?.startsWith("Forwarded to");
+                                                        const approvedText = isForwarded ? "Sent" : t("approved");
+                                                        const approvedBg = isForwarded ? "bg-blue-50 dark:bg-blue-900/20" : "bg-green-50 dark:bg-green-900/20";
+                                                        const approvedTextColor = isForwarded ? "text-blue-700 dark:text-blue-400" : "text-green-700 dark:text-green-400";
+                                                        const approvedBorder = isForwarded ? "border-blue-200 dark:border-blue-800/30" : "border-green-200 dark:border-green-800/30";
+
                                                         if (selectedRequest.status === "Failed") {
                                                             if (myIdx === currIdx) { actionText = t("rejected"); bgClass = "bg-red-50 dark:bg-red-900/20"; textClass = "text-red-700 dark:text-red-400"; borderClass = "border-red-200 dark:border-red-800/30"; }
-                                                            else if (myIdx < currIdx) { actionText = t("approved"); bgClass = "bg-green-50 dark:bg-green-900/20"; textClass = "text-green-700 dark:text-green-400"; borderClass = "border-green-200 dark:border-green-800/30"; }
+                                                            else if (myIdx < currIdx) { actionText = approvedText; bgClass = approvedBg; textClass = approvedTextColor; borderClass = approvedBorder; }
                                                         } else if (selectedRequest.status === "Assigned to Improve") {
                                                             if (myIdx === currIdx) {
                                                                 actionText = `Returned to ${selectedRequest.senderDepartment || "Sender"}`;
                                                                 bgClass = "bg-purple-50 dark:bg-purple-900/20"; textClass = "text-purple-700 dark:text-purple-400"; borderClass = "border-purple-200 dark:border-purple-800/30";
                                                             }
-                                                            else if (myIdx < currIdx) { actionText = t("approved"); bgClass = "bg-green-50 dark:bg-green-900/20"; textClass = "text-green-700 dark:text-green-400"; borderClass = "border-green-200 dark:border-green-800/30"; }
+                                                            else if (myIdx < currIdx) { actionText = approvedText; bgClass = approvedBg; textClass = approvedTextColor; borderClass = approvedBorder; }
                                                         } else if (selectedRequest.status === "Completed") {
-                                                            actionText = t("approved"); bgClass = "bg-green-50 dark:bg-green-900/20"; textClass = "text-green-700 dark:text-green-400"; borderClass = "border-green-200 dark:border-green-800/30";
+                                                            actionText = approvedText; bgClass = approvedBg; textClass = approvedTextColor; borderClass = approvedBorder;
                                                         } else if (selectedRequest.status === "In Progress" || selectedRequest.status === "In Progressing") {
-                                                            if (myIdx < currIdx) { actionText = t("approved"); bgClass = "bg-green-50 dark:bg-green-900/20"; textClass = "text-green-700 dark:text-green-400"; borderClass = "border-green-200 dark:border-green-800/30"; }
+                                                            if (myIdx < currIdx) { actionText = approvedText; bgClass = approvedBg; textClass = approvedTextColor; borderClass = approvedBorder; }
                                                             else {
                                                                 if (hasAssignee && !isAssignedToMe) {
                                                                     actionText = `Assigned to ${getEnglishName(currentStepData.assignedTo.name)}`;
@@ -1400,22 +1618,64 @@ export default function ReceivedPage() {
                                     {/* Unified Document Content Box */}
                                     <div className="border border-gray-200 dark:border-[#2A2F3A] rounded-lg mb-6 flex flex-col shadow-sm overflow-hidden bg-white dark:bg-[#161B22]">
                                         {/* Metadata Header */}
-                                        <div className="bg-[#f4f4f5] dark:bg-[#242B36] p-4 border-b border-gray-200 dark:border-[#2A2F3A] flex flex-col gap-1.5 text-[12px]">
+                                        <div className="bg-[#f4f4f5] dark:bg-[#242B36] p-4 border-b border-gray-200 dark:border-[#2A2F3A] flex flex-col gap-1.5 text-[13px]">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-[70px] uppercase">{t("from")} :</span>
+                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-15">{t("from")} :</span>
                                                 <span className="font-bold text-gray-800 dark:text-white truncate">(Dept {selectedRequest.senderDepartment}) - {getDisplaySenderName(selectedRequest)} &lt;{getSenderEmail(selectedRequest)}&gt;</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-[70px] uppercase">{t("to")} :</span>
-                                                <span className="text-gray-700 dark:text-gray-300 truncate">{getDisplayReceiver(selectedRequest)}</span>
+                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-15">File :</span>
+                                                <span className="text-gray-700 dark:text-gray-300 truncate">
+                                                    {selectedRequest.files && selectedRequest.files.length > 0 
+                                                        ? selectedRequest.files.map(f => f.name).join(", ")
+                                                        : "No file attached"}
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-[70px] uppercase">{t("subject")} :</span>
+                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-15">{t("title")} :</span>
                                                 <span className="text-gray-700 dark:text-gray-300 truncate">{selectedRequest.title || selectedRequest.subject}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-15">{t("tag") || "Tag"} :</span>
+                                                <div className="flex items-center">
+                                                  {(() => {
+                                                      const p = (selectedRequest.urgency || "Normal").toLowerCase().trim();
+                                                      if (p === "urgent") return (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400 font-extrabold text-[10px] uppercase tracking-wider border border-red-200 dark:border-red-500/20 shadow-sm leading-tight">
+                                                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                                          {t('urgent') || 'Urgent'}
+                                                        </span>
+                                                      );
+                                                      if (p === "high") return (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 font-extrabold text-[10px] uppercase tracking-wider border border-orange-200 dark:border-orange-500/20 shadow-sm leading-tight">
+                                                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                                                          {t('high') || 'High'}
+                                                        </span>
+                                                      );
+                                                      if (p === "medium") return (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400 font-extrabold text-[10px] uppercase tracking-wider border border-yellow-200 dark:border-yellow-500/20 shadow-sm leading-tight">
+                                                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                                                          {t('medium') || 'Medium'}
+                                                        </span>
+                                                      );
+                                                      if (p === "normal") return (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-extrabold text-[10px] uppercase tracking-wider border border-green-200 dark:border-green-500/20 shadow-sm leading-tight">
+                                                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                          {t('normal') || 'Normal'}
+                                                        </span>
+                                                      );
+                                                      return (
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 font-extrabold text-[10px] uppercase tracking-wider border border-blue-200 dark:border-blue-500/20 shadow-sm leading-tight">
+                                                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                                          {selectedRequest.urgency}
+                                                        </span>
+                                                      );
+                                                  })()}
+                                                </div>
                                             </div>
                                             {hasAssignee && (
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className="font-bold text-blue-500 w-[70px] uppercase">{t("assigned")} :</span>
+                                                    <span className="font-bold text-blue-500 w-20 uppercase">{t("assigned")} :</span>
                                                     <span className="text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded text-xs truncate">
                                                         {getEnglishName(currentStepData.assignedTo.name)}
                                                     </span>
@@ -1428,9 +1688,148 @@ export default function ReceivedPage() {
                                                 ? selectedRequest.declineReason
                                                 : (selectedRequest.details || selectedRequest.description || "No description provided.")}
                                         </div>
+
+                                        {/* Attachments Section */}
+                                        {((selectedRequest.files && selectedRequest.files.length > 0) || isMyTurn) && (
+                                            <div className="px-5 pb-5 pt-3 border-t border-gray-100 dark:border-[#2A2F3A] mt-2">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <span className="font-bold text-gray-700 dark:text-gray-300 text-[13px]">{t("attached_file") || "Attached Files"}</span>
+                                                    {isMyTurn && (
+                                                        <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors text-[12px] font-bold border border-blue-200 dark:border-blue-500/20 shadow-sm">
+                                                            <Plus size={14} strokeWidth={3} />
+                                                            {t("add_new") || "Add New"}
+                                                            <input type="file" multiple className="hidden" onChange={handleFileAdded} />
+                                                        </label>
+                                                    )}
+                                                </div>
+                                                {selectedRequest.files && selectedRequest.files.length > 0 ? (
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                        {selectedRequest.files.map((file, idx) => {
+                                                            const isIntermediateReceiver = isMyTurn && ((selectedRequest.currentStepIndex !== undefined ? selectedRequest.currentStepIndex : 0) < (selectedRequest.path ? selectedRequest.path.length - 1 : 0));
+                                                            if (selectedRequest.status === "Assigned to Improve" || selectedRequest.status === "Failed" || isMyTurn) {
+                                                                return (
+                                                                    <div
+                                                                        key={idx}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setActiveFileIndex(idx);
+                                                                            setIsPreviewOpen(true);
+                                                                        }}
+                                                                        className="bg-gray-100 dark:bg-[#242B36] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-2 flex items-center justify-between relative shadow-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors"
+                                                                    >
+                                                                        <div className="flex items-center gap-3 w-full pr-8">
+                                                                            <div className="w-8 h-10 border border-red-200 flex flex-col items-center justify-center bg-white rounded shrink-0 relative overflow-hidden">
+                                                                                <FileText size={16} className="text-red-500 mb-2" />
+                                                                                <div className="absolute bottom-0 left-0 right-0 bg-red-500 flex justify-center py-[1px]">
+                                                                                    <span className="text-[6px] text-white font-bold leading-none">PDF</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex flex-col flex-1 min-w-0">
+                                                                                <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 truncate">{file.name || "document.pdf"}</span>
+                                                                                <span className="text-[10px] text-gray-400 truncate">{formatFileSize(file.size)}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleDownload(e, file); }}
+                                                                                className="text-[#4a7239] hover:text-green-800 p-1"
+                                                                            >
+                                                                                <UploadCloud size={16} />
+                                                                            </button>
+                                                                            {(
+                                                                                (selectedRequest.status === "Assigned to Improve" && (selectedRequest.improveAssignedTo || "").toLowerCase().trim() === userDept) ||
+                                                                                isMyTurn
+                                                                            ) && (
+                                                                                    <button
+                                                                                        onClick={(e) => handleDeleteFile(e, idx)}
+                                                                                        className="text-red-500 hover:text-red-700 p-1"
+                                                                                    >
+                                                                                        <X size={16} />
+                                                                                    </button>
+                                                                                )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <div key={idx} onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveFileIndex(idx);
+                                                                    setIsPreviewOpen(true);
+                                                                }}
+                                                                    className="flex items-center gap-2 p-2 bg-white dark:bg-[#242B36] border border-gray-200 dark:border-[#2A2F3A] rounded-lg relative cursor-pointer hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors shadow-xs"
+                                                                >
+                                                                    <div className="w-8 h-10 border border-red-200 flex flex-col items-center justify-center bg-white rounded shrink-0 relative overflow-hidden">
+                                                                        <FileText size={16} className="text-red-500 mb-2" />
+                                                                        <div className="absolute bottom-0 left-0 right-0 bg-red-500 flex justify-center py-[1px]">
+                                                                            <span className="text-[6px] text-white font-bold leading-none">PDF</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex flex-col flex-1 min-w-0 pr-6">
+                                                                        <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 truncate">{file.name || "document.pdf"}</span>
+                                                                        <span className="text-[10px] text-gray-400 truncate">{formatFileSize(file.size)}</span>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDownload(e, file); }}
+                                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-1"
+                                                                    >
+                                                                        <DownloadCloud size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[13px] text-gray-500 dark:text-gray-400 italic">No files attached yet. Click "Add New" to upload.</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                    {/* Approval Information (Only when Completed) */}
-                                    {selectedRequest.status === "Completed" && (
+
+                                    {/* Forward Section for Custom Request */}
+                                    {isMyTurn && selectedRequest.documentType === "Custom Request" && (
+                                        <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-6 shadow-sm mb-6 flex flex-col gap-4">
+                                            <p className="text-[13px] italic text-gray-800 dark:text-gray-400">
+                                                This will forward the document to the next person for review and approval.
+                                            </p>
+                                            <div>
+                                                <label className="block text-[15px] font-bold text-gray-900 dark:text-white mb-2">
+                                                    Forward To:
+                                                </label>
+                                                <div className="flex gap-4 items-center w-full">
+                                                    <div className="flex-1">
+                                                        <CustomSelect
+                                                            name="forwardTo"
+                                                            value={forwardToDept}
+                                                            onChange={(e) => setForwardToDept(e.target.value)}
+                                                            placeholder="Select your destination"
+                                                            options={departments.map(d => ({ label: d.title, value: d.title }))}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        onClick={handleForwardClick}
+                                                        className="px-6 py-[11px] bg-[#1976D2] hover:bg-[#1565C0] text-white text-[14px] font-bold rounded-md shadow-sm transition-colors cursor-pointer"
+                                                    >
+                                                        Send
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Approval Information (Only when Completed, and only for sender or approver) */}
+                                    {selectedRequest.status === "Completed" && (() => {
+                                        const myEmail = (currentUser?.email || "").toLowerCase().trim();
+                                        const senderEmail = (selectedRequest.senderEmail || "").toLowerCase().trim();
+                                        const isSender = myEmail && senderEmail === myEmail;
+                                        
+                                        const currentUserName1 = (currentUser?.username || "").toLowerCase().trim();
+                                        const currentUserName2 = `${currentUser?.firstName || ""} ${currentUser?.lastName || ""}`.toLowerCase().trim();
+                                        const completedBy = (selectedRequest.completedBy || "").toLowerCase().trim();
+                                        const isApprover = (completedBy === currentUserName1 && currentUserName1 !== "") || 
+                                                           (completedBy === currentUserName2 && currentUserName2 !== "");
+                                                           
+                                        return isSender || isApprover;
+                                    })() && (
                                         <div className="bg-white dark:bg-[#161B22] border border-green-200 dark:border-green-900/50 rounded-lg p-6 shadow-sm flex flex-col mb-6">
                                             <div className="flex items-center gap-2 mb-6">
                                                 <CheckCircle size={20} className="text-green-600" />
@@ -1456,7 +1855,7 @@ export default function ReceivedPage() {
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[14px] text-gray-500 font-medium w-[120px]">{t("from")} :</span>
                                                         <span className="text-[15px] font-bold text-gray-900 dark:text-white">
-                                                            {selectedRequest.completedByRole.toLowerCase().startsWith("dept")
+                                                            {selectedRequest.completedByRole.toLowerCase().startsWith("")
                                                                 ? selectedRequest.completedByRole
                                                                 : `Dept ${selectedRequest.completedByRole}`}
                                                         </span>
@@ -1522,98 +1921,8 @@ export default function ReceivedPage() {
                                                 <span className="text-[11px] font-bold text-gray-400">File Supported .png, .jpg, & .jpeg</span>
                                             </div>
                                         )}
-                                    {/* Attachments Section */}
-                                    {selectedRequest.files && selectedRequest.files.length > 0 && (
-                                        <div className="mb-6">
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                {selectedRequest.files.map((file, idx) => {
-                                                    const isIntermediateReceiver = isMyTurn && ((selectedRequest.currentStepIndex !== undefined ? selectedRequest.currentStepIndex : 0) < (selectedRequest.path ? selectedRequest.path.length - 1 : 0));
-                                                    if (selectedRequest.status === "Assigned to Improve" || selectedRequest.status === "Failed" || isIntermediateReceiver) {
-                                                        return (
-                                                            <div
-                                                                key={idx}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setActiveFileIndex(idx);
-                                                                    setIsPreviewOpen(true);
-                                                                }}
-                                                                className="bg-gray-100 dark:bg-[#242B36] border border-gray-200 dark:border-[#2A2F3A] rounded-lg p-2 flex items-center justify-between relative shadow-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors"
-                                                            >
-                                                                <div className="flex items-center gap-3 w-full pr-8">
-                                                                    <div className="w-8 h-10 border border-red-200 flex flex-col items-center justify-center bg-white rounded shrink-0 relative overflow-hidden">
-                                                                        <FileText size={16} className="text-red-500 mb-2" />
-                                                                        <div className="absolute bottom-0 left-0 right-0 bg-red-500 flex justify-center py-[1px]">
-                                                                            <span className="text-[6px] text-white font-bold leading-none">PDF</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex flex-col flex-1 min-w-0">
-                                                                        <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 truncate">{file.name || "document.pdf"}</span>
-                                                                        <span className="text-[10px] text-gray-400 truncate">{formatFileSize(file.size)}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleDownload(e, file); }}
-                                                                        className="text-[#4a7239] hover:text-green-800 p-1"
-                                                                    >
-                                                                        <UploadCloud size={16} />
-                                                                    </button>
-                                                                    {(
-                                                                        (selectedRequest.status === "Assigned to Improve" && (selectedRequest.improveAssignedTo || "").toLowerCase().trim() === userDept) ||
-                                                                        (isIntermediateReceiver && file.addedBy === userDept)
-                                                                    ) && (
-                                                                            <button
-                                                                                onClick={(e) => handleDeleteFile(e, idx)}
-                                                                                className="text-red-500 hover:text-red-700 p-1"
-                                                                            >
-                                                                                <X size={16} />
-                                                                            </button>
-                                                                        )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return (
-                                                        <div key={idx} onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setActiveFileIndex(idx);
-                                                            setIsPreviewOpen(true);
-                                                        }}
-                                                            className="flex items-center gap-2 p-2 bg-white dark:bg-[#242B36] border border-gray-200 dark:border-[#2A2F3A] rounded-lg relative cursor-pointer hover:bg-gray-50 dark:hover:bg-[#242B36] transition-colors shadow-xs"
-                                                        >
-                                                            <div className="w-8 h-10 border border-red-200 flex flex-col items-center justify-center bg-white rounded shrink-0 relative overflow-hidden">
-                                                                <FileText size={16} className="text-red-500 mb-2" />
-                                                                <div className="absolute bottom-0 left-0 right-0 bg-red-500 flex justify-center py-[1px]">
-                                                                    <span className="text-[6px] text-white font-bold leading-none">PDF</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex flex-col flex-1 min-w-0 pr-6">
-                                                                <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 truncate">{file.name || "document.pdf"}</span>
-                                                                <span className="text-[10px] text-gray-400 truncate">{formatFileSize(file.size)}</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDownload(e, file); }}
-                                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-1"
-                                                            >
-                                                                <DownloadCloud size={14} />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* Content / Comment Textarea */}
-                                    {selectedRequest.status !== "Completed" && selectedRequest.status !== "Failed" && selectedRequest.status !== "Assigned to Improve" && (
-                                        <div className="mb-6">
-                                            <textarea
-                                                value={pageComment}
-                                                onChange={(e) => setPageComment(e.target.value)}
-                                                placeholder={t("write_something")}
-                                                className="w-full min-h-[120px] p-4 bg-[#f8f9fa] dark:bg-[#242B36] border border-[#e5e5e5] dark:border-[#2A2F3A] rounded-lg text-[13px] text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-500 focus:bg-white dark:focus:bg-[#1c1c1e] transition-colors resize-y"
-                                            />
-                                        </div>
-                                    )}
+                                    {/* Attachments Section moved to Unified Document Content Box */}
+
                                     {selectedRequest.status === "Failed" && (
                                         <div className="mt-auto pt-4 pb-2">
                                             <div className="p-4 bg-[#fef2f2] border border-[#fecaca] rounded-sm text-[#dc2626] text-[14px] leading-relaxed shadow-sm">

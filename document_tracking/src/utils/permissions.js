@@ -1,30 +1,42 @@
 // Centralized Role-Based Access Control (RBAC) Logic
 export const hasPermission = (currentUser, menuName, action) => {
   if (!currentUser) return false;
-  // Global Super Admins bypass all restrictions
-  const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
-  if (isGlobalSuperAdmin) return true;
-  try {
-    const permissionsData = localStorage.getItem("doc_tracking_permissions");
-    if (!permissionsData) return true; // Default ALLOW if matrix is not set up
-    const permissions = JSON.parse(permissionsData);
-    
-    // Construct the key used in Set Role Permission matrix: "DepartmentName-RoleName"
-    let userDept = currentUser.department || currentUser.mainRole || "Default";
-    if (userDept.toLowerCase().trim() === "itc" || userDept.toLowerCase().trim() === "itc center") {
-      userDept = "IT Center";
-    }
-    const userType = currentUser.type || currentUser.role || "Staff";
-    const key = `${userDept}-${userType}`;
-    // If permissions exist for this role, check the specific action for the menu
-    if (permissions[key] && permissions[key][menuName]) {
-      // Return true if the action is explicitly allowed, false if explicitly denied
-      return !!permissions[key][menuName][action];
-    }
-    // Default ALLOW if this specific role or menu hasn't been configured yet
+  
+  // The Global System Admin bypasses all restrictions
+  if (currentUser?.email === "admin@rupp.edu.kh" || currentUser?.role?.toLowerCase() === "super admin") {
     return true;
+  }
+
+  try {
+    // The permissions are now loaded directly from the API and stored on the currentUser object
+    const permissions = currentUser.permissions || {};
+    
+    // Normalize menu names just in case
+    const menuMap = {
+      "Request": "Request Document",
+      "Receive": "Received Document",
+      "Type Document": "Document Type",
+      // Reverse mapping
+      "Request Document": "Request",
+      "Received Document": "Receive",
+      "Document Type": "Type Document"
+    };
+    
+    const actualMenuName = menuMap[menuName] || menuName;
+
+    // Check exact requested name first
+    if (permissions[menuName] && permissions[menuName][action] !== undefined) {
+      return !!permissions[menuName][action];
+    }
+    // Check mapped name
+    if (permissions[actualMenuName] && permissions[actualMenuName][action] !== undefined) {
+      return !!permissions[actualMenuName][action];
+    }
+    
+    // Default DENY if this specific role or menu action is unconfigured
+    return false;
   } catch (error) {
-    console.error("Error reading permissions from localStorage", error);
-    return true; // Default ALLOW on error
+    console.error("Error evaluating permissions", error);
+    return false; // Default DENY on error for security
   }
 };

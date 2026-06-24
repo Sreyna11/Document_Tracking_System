@@ -362,7 +362,7 @@ export default function DocumentTypePage() {
                   <h1 className="text-3xl font-bold text-black dark:text-white">{viewState === "EDIT" ? t("edit_document_type") : t("create_document_type")}</h1>
                   <button
                     onClick={cancelCreate}
-                    className="px-6 py-2 bg-gray-400 hover:bg-gray-500 dark:bg-[#4E4F50] dark:hover:bg-[#242B36] text-white text-[14px] font-medium rounded-md transition-colors"
+                    className="px-6 py-2 bg-gray-500 hover:bg-gray-600 dark:bg-[#4E4F50] dark:hover:bg-[#242B36] text-white text-[14px] font-medium rounded-md transition-colors"
                   >
                     {t("back")}
                   </button>
@@ -485,6 +485,10 @@ export default function DocumentTypePage() {
                                   disabled={true}
                                   placeholder="Search user..."
                                   selectPlaceholder={t("select_user_sign")}
+                                  getDisplayValue={(val) => {
+                                    if (!val) return "Unknown";
+                                    return val.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim() || val;
+                                  }}
                                 />
                               </div>
                             </div>

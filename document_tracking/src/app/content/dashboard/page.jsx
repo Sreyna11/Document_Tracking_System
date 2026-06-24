@@ -5,6 +5,7 @@ import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
 import { useLanguage } from "../../context/LanguageContext";
 import { useSidebar } from "../../context/SidebarContext";
+import CustomSelect from "@/components/CustomSelect";
 import {
     AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
     BarChart, Bar, Cell
@@ -259,21 +260,25 @@ export default function DashboardPage() {
                 let longestStepName = "Unknown";
                 let totalMs = 0;
                 let stepsDetail = [];
-                if (r.path && r.path.length > 1) {
-                    for (let i = 1; i < r.path.length; i++) {
+                if (r.path && r.path.length > 0) {
+                    for (let i = 0; i < r.path.length; i++) {
                         const currentStepObj = r.path[i];
                         const deptName = typeof currentStepObj === 'string' ? currentStepObj : currentStepObj.department || currentStepObj.mainRole || "Unknown";
-                        let startStr = currentStepObj.viewedAt || r.path[i - 1].approvedAt || r.date;
+                        
+                        let stepMs = 0;
+                        let startStr = i === 0 ? (currentStepObj.viewedAt || r.date) : (currentStepObj.viewedAt || r.path[i - 1].approvedAt || r.date);
                         let endStr = currentStepObj.approvedAt || new Date().toISOString();
-                        const stepMs = getExactTimeMs(startStr, endStr);
+                        stepMs = getExactTimeMs(startStr, endStr);
                         totalMs += stepMs;
+                        
                         if (stepMs >= longestStepMs) {
                             longestStepMs = stepMs;
                             longestStepName = deptName;
                         }
+                        
                         stepsDetail.push({
-                            index: i,
-                            name: `Step ${i}`,
+                            index: i + 1,
+                            name: `Step ${i + 1}`,
                             department: deptName,
                             timeMs: stepMs,
                             timeFormatted: formatDuration(stepMs)
@@ -387,24 +392,23 @@ export default function DashboardPage() {
                                 <Calendar size={16} className="text-slate-400 dark:text-slate-500" />
                                 {today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </div>
-                            <div className="relative">
-                                <select
+                            <div className="relative w-40">
+                                <CustomSelect
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="appearance-none bg-white dark:bg-[#161B22] px-4 py-2 pr-10 rounded-lg border border-slate-200 dark:border-[#2A2F3A] shadow-sm text-sm font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                                >
-                                    {monthOptions.map(m => (
-                                        <option key={m} value={m}>{m === currentMonthValue ? "This Month" : formatMonthOption(m)}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                                    placeholder={t('select_month') || 'Select month...'}
+                                    options={monthOptions.map(m => ({
+                                        label: m === currentMonthValue ? "This Month" : formatMonthOption(m),
+                                        value: m
+                                    }))}
+                                />
                             </div>
                         </div>
                     </div>
                     {/* Top Metric Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {/* Action Required */}
-                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/received")}>
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/receive")}>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-500 dark:text-orange-400">
                                     <Bell size={16} />
@@ -415,7 +419,7 @@ export default function DashboardPage() {
                             <div className="text-xs font-semibold text-orange-500 dark:text-orange-400 mt-1 flex items-center gap-1">{t("requires_attention")} <ChevronRight size={12} /></div>
                         </div>
                         {/* Total Sent */}
-                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/tracking-document")}>
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/history-request")}>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-500 dark:text-purple-400">
                                     <FileText size={16} />
@@ -426,7 +430,7 @@ export default function DashboardPage() {
                             <div className="text-xs font-semibold text-purple-500 dark:text-purple-400 mt-1 flex items-center gap-1">{t("documents_initiated")} <ChevronRight size={12} /></div>
                         </div>
                         {/* Completed */}
-                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/completed")}>
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/history-request")}>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500 dark:text-emerald-400">
                                     <CheckCircle size={16} />
@@ -437,7 +441,7 @@ export default function DashboardPage() {
                             <div className="text-xs font-semibold text-emerald-500 dark:text-emerald-400 mt-1 flex items-center gap-1">{t("successfully_finished")} <ChevronRight size={12} /></div>
                         </div>
                         {/* Returned / Failed */}
-                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/returned")}>
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/history-request")}>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-500 dark:text-rose-400">
                                     <XCircle size={16} />
@@ -448,7 +452,7 @@ export default function DashboardPage() {
                             <div className="text-xs font-semibold text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1">{t("needs_corrections")} <ChevronRight size={12} /></div>
                         </div>
                         {/* In Progress */}
-                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/in-progress")}>
+                        <div className="bg-white dark:bg-[#161B22] rounded-xl p-5 border border-slate-100 dark:border-[#2A2F3A] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md cursor-pointer" onClick={() => router.push("/content/history-request")}>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 dark:text-blue-400">
                                     <Clock size={16} />
@@ -549,11 +553,11 @@ export default function DashboardPage() {
                             <div className="flex-1 overflow-x-auto">
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead>
-                                        <tr className="text-xs font-semibold text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-[#2A2F3A]">
-                                            <th className="pb-3 font-medium">{t("type_document")}</th>
-                                            <th className="pb-3 font-medium">{t("title") || "Title"}</th>
-                                            <th className="pb-3 font-medium text-center">{t("total_times")}</th>
-                                            <th className="pb-3 font-medium text-center">{t("action")}</th>
+                                        <tr className="text-[13px] font-semibold text-gray-800 dark:text-slate-500 border-b border-slate-100 dark:border-[#2A2F3A]">
+                                            <th className="pb-3 font-bold">{t("type_document")}</th>
+                                            <th className="pb-3 font-bold">{t("title") || "Title"}</th>
+                                            <th className="pb-3 font-bold text-center">{t("total_times")}</th>
+                                            <th className="pb-3 font-bold text-center">{t("action")}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="text-slate-700 dark:text-slate-300">
@@ -718,7 +722,21 @@ export default function DashboardPage() {
                                         <div className="flex flex-col gap-5 mb-8 flex-1">
                                             <div>
                                                 <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("requested_by")}</div>
-                                                <div className="text-sm font-semibold text-slate-800 dark:text-white">{selectedLongestReq.senderDepartment || "Unknown Department"}</div>
+                                                <div className="text-sm font-semibold text-slate-800 dark:text-white">
+                                                    {(() => {
+                                                        const req = selectedLongestReq;
+                                                        let name = req.senderName || req.createdBy;
+                                                        if (!name && req.path && req.path.length > 0 && typeof req.path[0] !== 'string') {
+                                                            name = req.path[0].senderName || req.path[0].user || req.path[0].actionBy;
+                                                        }
+                                                        if (name) {
+                                                            const u = usersList.find(u => u.username === name || u.email === name);
+                                                            if (u) return `${u.firstName || ''} ${u.lastName || ''}`.trim() || name;
+                                                            return name;
+                                                        }
+                                                        return req.senderDepartment || "Unknown User";
+                                                    })()}
+                                                </div>
                                             </div>
                                             <div>
                                                 <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">{t("requested_on")}</div>
@@ -767,11 +785,9 @@ export default function DashboardPage() {
                                                             <td className="px-4 py-3.5 text-slate-600 dark:text-slate-400">{step.index}. {step.name}</td>
                                                             <td className="px-4 py-3.5 text-slate-800 dark:text-white font-semibold">{step.department}</td>
                                                             <td className="px-4 py-3.5 text-right">
-                                                                {step.timeMs > 0 ? (
-                                                                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${step.timeMs === selectedLongestReq.longestStepMs ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-[#161B22] text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700'}`}>
-                                                                        {step.timeFormatted}
-                                                                    </span>
-                                                                ) : <span className="text-slate-400 dark:text-slate-600 font-bold">—</span>}
+                                                                <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold ${step.timeMs === selectedLongestReq.longestStepMs && step.timeMs > 0 ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50' : 'bg-slate-100 dark:bg-[#161B22] text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700'}`}>
+                                                                    {step.timeFormatted}
+                                                                </span>
                                                             </td>
                                                         </tr>
                                                     ))}
