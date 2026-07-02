@@ -34,15 +34,19 @@ export default function LoginPage() {
         const user = data.user;
         
         sessionStorage.setItem("auth_token", data.token);
-        sessionStorage.setItem("isAdminAuthenticated", user.role?.role_name === "Super Admin" ? "true" : "false");
+        sessionStorage.setItem("isAdminAuthenticated", user.type === "Super Admin" ? "true" : "false");
         
         sessionStorage.setItem("currentUser", JSON.stringify({
-          username: user.full_name || user.username,
+          username: user.fullname_en || user.username || user.fullname_kh,
+          fullname_en: user.fullname_en || null,
+          fullname_kh: user.fullname_kh || null,
           email: user.email,
-          role: user.role?.role_name || "Staff",
-          type: user.role?.role_name || "Staff",
+          role: user.role || "Staff",
+          type: user.type || "Staff",
           department: user.department?.name || "Global",
-          permissions: user.role?.permissions || {}
+          permissions: user.menu_permissions || {},
+          profilePhoto: user.profile_photo || null,
+          signaturePhoto: user.signature_photo || null
         }));
         
         router.push("/content");

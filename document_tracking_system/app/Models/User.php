@@ -10,19 +10,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     protected $table = "users";
 
     protected $primaryKey = "user_id";
 
     public $timestamps = true;
+
+    protected $appends = ['menu_permissions'];
 
     protected $fillable =[
         "username",
@@ -32,10 +35,10 @@ class User extends Authenticatable
         "fullname_en",
         "phone",
         "type",
+        "role",
         "profile_photo",
         "signature_photo",
         "department_id",
-        "role_id",
         "is_active",
         "created_at",
         "updated_at"
@@ -54,8 +57,39 @@ class User extends Authenticatable
         ];
     }
 
-    public function role(){
-        return $this->belongsTo(Role::class, "role_id", "role_id");
+
+
+    public function assignedRoles()
+    {
+        return $this->morphToMany(
+            config('permission.models.role'),
+            'model',
+            config('permission.table_names.model_has_roles'),
+            config('permission.column_names.model_morph_key'),
+            app(\Spatie\Permission\PermissionRegistrar::class)->pivotRole
+        );
+    }
+
+    public function getMenuPermissionsAttribute()
+    {
+        $permissions = [];
+        $originalTeamId = getPermissionsTeamId();
+        setPermissionsTeamId($this->department_id);
+
+        foreach ($this->getAllPermissions() as $permission) {
+            $parts = explode(' ', $permission->name, 2);
+            if (count($parts) === 2) {
+                $action = $parts[0];
+                $menu = $parts[1];
+                if (!isset($permissions[$menu])) {
+                    $permissions[$menu] = [];
+                }
+                $permissions[$menu][$action] = true;
+            }
+        }
+
+        setPermissionsTeamId($originalTeamId);
+        return $permissions;
     }
 
     public function department(){
@@ -86,22 +120,9 @@ class User extends Authenticatable
         return $this->hasMany(DocumentAccess::class, "granted_by", "user_id");
     }
 
-    /**
-     * Check if the user has a specific permission.
-     *
-     * @param string $menu
-     * @param string $action
-     * @return bool
-     */
     public function hasPermission(string $menu, string $action): bool
     {
-        if (!$this->role || !$this->role->permissions) {
-            return false;
-        }
-
-        $permissions = $this->role->permissions;
-
-        return isset($permissions[$menu][$action]) && $permissions[$menu][$action] === true;
+        return $this->hasPermissionTo("$action $menu");
     }
 
     /**

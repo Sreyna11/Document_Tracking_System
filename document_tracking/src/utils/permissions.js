@@ -3,7 +3,7 @@ export const hasPermission = (currentUser, menuName, action) => {
   if (!currentUser) return false;
   
   // The Global System Admin bypasses all restrictions
-  if (currentUser?.email === "admin@rupp.edu.kh" || currentUser?.role?.toLowerCase() === "super admin") {
+  if (currentUser?.email === "admin@rupp.edu.kh" || currentUser?.role?.toLowerCase() === "super admin" || currentUser?.type?.toLowerCase() === "super admin") {
     return true;
   }
 

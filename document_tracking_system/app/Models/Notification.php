@@ -22,6 +22,11 @@ class Notification extends Model
         "document_id",
         "message",
         "is_read",
+        "target_department",
+        "sender_name",
+        "sender_department",
+        "subject",
+        "details",
         "created_at"
     ];
 

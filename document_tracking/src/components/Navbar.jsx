@@ -4,6 +4,9 @@ import { useRouter } from "nextjs-toploader/app";
 import { Menu, Globe, User, Bell, Moon, Sun, Monitor, LogOut, X, FileText, Calendar, Inbox } from "lucide-react";
 import { useLanguage } from "../app/context/LanguageContext";
 import { useTheme } from "../app/context/ThemeContext";
+import { useAccounts, useUpdateAccount } from "../hooks/useAccounts";
+import { useNotifications, useUpdateNotification } from '../hooks/useNotifications';
+import { useDocuments } from '../hooks/useDocuments';
 
 const getEnglishName = (name) => {
   if (!name) return "";
@@ -23,6 +26,7 @@ const getLocalizedName = (name, language) => {
     return enPart || name;
   }
 };
+const EMPTY_ARRAY = [];
 
 export default function Navbar({
   isSidebarOpen,
@@ -36,10 +40,70 @@ export default function Navbar({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [users, setUsers] = useState([]);
+  const { data: notificationsDataRaw } = useNotifications();
+  const notificationsData = notificationsDataRaw || EMPTY_ARRAY;
+  const updateNotifMutation = useUpdateNotification();
+  const { data: usersRaw } = useAccounts();
+  const users = usersRaw || EMPTY_ARRAY;
   const { language, toggleLanguage, t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const updateAccountMutation = useUpdateAccount();
+  const { data: documentsRaw } = useDocuments();
+  const documents = documentsRaw || EMPTY_ARRAY;
+
+  // Delegation States
+  const [isDelegationModalOpen, setIsDelegationModalOpen] = useState(false);
+  const [delegateToEmail, setDelegateToEmail] = useState("");
+  const [delegateStartDate, setDelegateStartDate] = useState("");
+  const [delegateEndDate, setDelegateEndDate] = useState("");
+
+  const handleOpenDelegation = () => {
+    setIsProfileOpen(false);
+    const currentUserRecord = users.find(u => 
+      (u.email || "").toLowerCase().trim() === (currentUser?.email || "").toLowerCase().trim() ||
+      (u.username || "").toLowerCase().trim() === (currentUser?.username || "").toLowerCase().trim()
+    );
+    if (currentUserRecord?.delegation) {
+      setDelegateToEmail(currentUserRecord.delegation.delegateToEmail || "");
+      setDelegateStartDate(currentUserRecord.delegation.startDate || "");
+      setDelegateEndDate(currentUserRecord.delegation.endDate || "");
+    }
+    setIsDelegationModalOpen(true);
+  };
+
+  const handleSaveDelegation = async () => {
+    const currentUserRecord = users.find(u => 
+      (u.email || "").toLowerCase().trim() === (currentUser?.email || "").toLowerCase().trim() ||
+      (u.username || "").toLowerCase().trim() === (currentUser?.username || "").toLowerCase().trim()
+    );
+    if (!currentUserRecord) return;
+
+    let delegateToName = "";
+    if (delegateToEmail) {
+        const delegateUser = users.find(u => u.email === delegateToEmail);
+        delegateToName = delegateUser ? (delegateUser.fullname_en || delegateUser.fullname_kh || delegateUser.username) : "";
+    }
+
+    const updatedUser = {
+      ...currentUserRecord,
+      delegation: delegateToEmail ? {
+        delegateToEmail,
+        delegateToName,
+        startDate: delegateStartDate,
+        endDate: delegateEndDate,
+        isActive: true
+      } : null
+    };
+
+    try {
+      await updateAccountMutation.mutateAsync({ id: currentUserRecord.id, data: updatedUser });
+      setIsDelegationModalOpen(false);
+      // Optional: show a success toast
+    } catch (error) {
+      console.error("Failed to update delegation", error);
+    }
+  };
 
   const handleLogout = () => {
     sessionStorage.removeItem("isAdminAuthenticated");
@@ -62,25 +126,17 @@ export default function Navbar({
 
   useEffect(() => {
     if (currentUser) {
-      try {
-        const storedUsers = localStorage.getItem("doc_tracking_users");
-        if (storedUsers) {
-          const parsedUsers = JSON.parse(storedUsers);
-          if (Array.isArray(parsedUsers)) {
-            setUsers(parsedUsers);
-            const matched = parsedUsers.find(
-              (u) =>
-                (currentUser.email && u.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-                (`${u.firstName} ${u.lastName}`.toLowerCase().trim() === currentUser.username?.toLowerCase().trim())
-            );
-            if (matched && matched.profilePhoto) {
-              setProfilePhoto(matched.profilePhoto);
-              return;
-            }
-          }
+      if (users.length > 0) {
+        const matched = users.find(
+          (u) =>
+            (currentUser.email && u.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+            ((u.fullname_en || "").toLowerCase().trim() === currentUser.username?.toLowerCase().trim() ||
+             (u.fullname_kh || "").toLowerCase().trim() === currentUser.username?.toLowerCase().trim())
+        );
+        if (matched && matched.profilePhoto) {
+          setProfilePhoto(matched.profilePhoto);
+          return;
         }
-      } catch (e) {
-        console.error("Error reading users in Navbar", e);
       }
       if (currentUser.profilePhoto) {
         setProfilePhoto(currentUser.profilePhoto);
@@ -90,120 +146,112 @@ export default function Navbar({
     } else {
       setProfilePhoto(null);
     }
-  }, [currentUser]);
+  }, [currentUser, users]);
 
-  // Load and listen for notifications
   useEffect(() => {
     if (!currentUser) return;
-
-    const calculateUnread = (storageData) => {
-      try {
-        let allNotifs = storageData ? JSON.parse(storageData) : [];
-        if (allNotifs.length === 0) {
-          const userDept = (currentUser.mainRole || currentUser.department || "ITC").trim();
-          allNotifs = [
-            {
-              id: "demo-notif-1",
-              requestId: "",
-              targetDepartment: userDept,
-              senderName: "Sokha Chan",
-              senderDepartment: "Academic Affairs",
-              subject: "Urgent: Academic Curriculum Review 2026",
-              details: "Please review and approve the updated curriculum guidelines for the upcoming academic year.",
-              date: new Date().toISOString().split('T')[0],
-              time: "09:30 AM",
-              read: false,
-              priorityLevel: "Urgent"
-            },
-            {
-              id: "demo-notif-2",
-              requestId: "",
-              targetDepartment: userDept,
-              senderName: "Sreymao Keo",
-              senderDepartment: "Finance Department",
-              subject: "High: Budget Proposal Q3 Approval",
-              details: "The quarterly budget request has been prepared and forwarded to your department for verification.",
-              date: new Date().toISOString().split('T')[0],
-              time: "11:15 AM",
-              read: false,
-              priorityLevel: "High"
-            },
-            {
-              id: "demo-notif-3",
-              requestId: "",
-              targetDepartment: userDept,
-              senderName: "Borith Lim",
-              senderDepartment: "Human Resources",
-              subject: "Normal: Annual Staff Training Plan",
-              details: "The annual training schedule for administrative staff has been submitted for validation.",
-              date: new Date().toISOString().split('T')[0],
-              time: "02:45 PM",
-              read: true,
-              priorityLevel: "Normal"
-            }
-          ];
-          localStorage.setItem("doc_tracking_notifications", JSON.stringify(allNotifs));
-          window.dispatchEvent(new Event("notifications_updated"));
-          return;
+    try {
+      const allNotifs = Array.isArray(notificationsData) ? notificationsData.map(n => {
+        let dateStr = "";
+        let timeStr = "";
+        if (n.created_at || n.date) {
+          const d = new Date(n.created_at || n.date);
+          if (!isNaN(d.getTime())) {
+            dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          }
         }
-
-        const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
-        let myNotifs = allNotifs.filter(n => {
-          if (userDept === "global") return true;
-          const target = (n.targetDepartment || "").toLowerCase().trim();
-          return target === userDept ||
-            (userDept === "itc" && target.includes("information technology")) ||
-            (userDept === "acc" && target.includes("accounting")) ||
-            (userDept === "inventory" && target.includes("inventory"));
+        return {
+          ...n,
+          id: n.notification_id || n.id,
+          targetDepartment: n.target_department || n.targetDepartment,
+          senderName: n.sender_name || n.senderName,
+          senderDepartment: n.sender_department || n.senderDepartment,
+          requestId: n.document_id || n.requestId,
+          read: n.is_read || n.read,
+          date: dateStr || n.date,
+          time: timeStr || n.time,
+        };
+      }) : [];
+      const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+      let myNotifs = allNotifs.filter(n => {
+        if (userDept === "global") return true;
+        
+        const target = (n.targetDepartment || "").toLowerCase().trim();
+        
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        const hasDelegation = users.some(u => {
+            const uDept = (u.mainRole || u.department || "").toLowerCase().trim();
+            if (uDept !== target || !u.delegation || !u.delegation.isActive) return false;
+            if (u.delegation.delegateToEmail !== currentUser?.email) return false;
+            const start = new Date(u.delegation.startDate);
+            const end = new Date(u.delegation.endDate);
+            end.setHours(23,59,59,999);
+            return start <= new Date() && end >= now;
         });
 
-        // Set notifications list (newest first as they are unshifted into storage)
-        const sortedNotifs = [...myNotifs];
-        setNotifications(sortedNotifs);
+        const targetMatch = target === userDept ||
+          (userDept === "itc" && target.includes("information technology")) ||
+          (userDept === "acc" && target.includes("accounting")) ||
+          (userDept === "inventory" && target.includes("inventory")) ||
+          hasDelegation;
+          
+        if (!targetMatch) return false;
 
-        const oldNotifs = previousNotifsRef.current;
-        const newUnreadNotifs = myNotifs.filter(n => !n.read && !oldNotifs.some(old => old.id === n.id));
-
-        if (oldNotifs.length > 0 && newUnreadNotifs.length > 0) {
-          setToastNotif(newUnreadNotifs[0]);
-          setTimeout(() => setToastNotif(null), 5000);
+        // Individual checking
+        const req = documents.find(d => d.id === n.requestId);
+        if (req) {
+            // For completed, failed, or returned documents, only the original sender should see it
+            if (req.status === "Completed" || req.status === "Failed" || req.status === "Assigned to Improve") {
+                const isExactSender = (req.senderEmail && currentUser?.email && req.senderEmail.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) || 
+                                      (req.senderName && currentUser?.username && req.senderName.toLowerCase().trim() === currentUser.username.toLowerCase().trim());
+                if (!isExactSender && (req.senderDepartment || "").toLowerCase().trim() === userDept) {
+                    return false; // User is in sender dept but is NOT the sender
+                }
+            } else {
+                // For pending documents, if it is assigned to a specific person, only that person should see it
+                const currentStepIndex = req.currentStepIndex || 0;
+                const currentStep = req.path ? req.path[currentStepIndex] : null;
+                if (currentStep && currentStep.assignedTo && currentStep.assignedTo.email) {
+                    if (currentStep.assignedTo.email.toLowerCase().trim() !== currentUser?.email?.toLowerCase().trim()) {
+                        return false;
+                    }
+                }
+            }
         }
-        previousNotifsRef.current = myNotifs;
-        const unread = myNotifs.filter(n => !n.read).length;
-        setUnreadCount(unread);
-      } catch (e) {
-        console.error("Error calculating unread notifications", e);
+        return true;
+      });
+
+      const sortedNotifs = [...myNotifs];
+      setNotifications(sortedNotifs);
+
+      const oldNotifs = previousNotifsRef.current;
+      const newUnreadNotifs = myNotifs.filter(n => (!n.read && !n.is_read) && !oldNotifs.some(old => old.id === n.id));
+
+      if (oldNotifs.length > 0 && newUnreadNotifs.length > 0) {
+        setToastNotif(newUnreadNotifs[0]);
+        setTimeout(() => setToastNotif(null), 5000);
       }
-    };
-
-    calculateUnread(localStorage.getItem("doc_tracking_notifications"));
-
-    const handleStorageChange = (e) => {
-      if (e.key === "doc_tracking_notifications") {
-        calculateUnread(e.newValue);
-      }
-    };
-    const handleLocalUpdate = () => {
-      calculateUnread(localStorage.getItem("doc_tracking_notifications"));
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("notifications_updated", handleLocalUpdate);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("notifications_updated", handleLocalUpdate);
-    };
-  }, [currentUser]);
+      previousNotifsRef.current = myNotifs;
+      const unread = myNotifs.filter(n => (!n.read && !n.is_read)).length;
+      setUnreadCount(unread);
+    } catch (e) {
+      console.error("Error calculating unread notifications", e);
+    }
+  }, [currentUser, notificationsData, users, documents]);
 
   const getSenderPhoto = (senderName) => {
     if (!senderName || users.length === 0) return null;
     const sName = getEnglishName(senderName).toLowerCase().trim();
     const match = users.find(
       (u) => {
-        const uFirstLast = getEnglishName(`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim();
+        const fEn = getEnglishName(u.fullname_en || "").toLowerCase().trim();
+        const fKh = getEnglishName(u.fullname_kh || "").toLowerCase().trim();
         const uUser = getEnglishName(u.username || "").toLowerCase().trim();
-        return uFirstLast === sName || uUser === sName || 
-               (`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim() === senderName.toLowerCase().trim() ||
+        return fEn === sName || fKh === sName || uUser === sName || 
+               (u.fullname_en || "").toLowerCase().trim() === senderName.toLowerCase().trim() ||
+               (u.fullname_kh || "").toLowerCase().trim() === senderName.toLowerCase().trim() ||
                (u.username || "").toLowerCase().trim() === senderName.toLowerCase().trim();
       }
     );
@@ -211,35 +259,16 @@ export default function Navbar({
   };
 
   const markAsRead = (id) => {
-    try {
-      const storedNotifs = localStorage.getItem("doc_tracking_notifications");
-      let allNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
-      const updated = allNotifs.map(n => n.id === id ? { ...n, read: true } : n);
-      localStorage.setItem("doc_tracking_notifications", JSON.stringify(updated));
-      window.dispatchEvent(new Event("notifications_updated"));
-    } catch (e) {
-      console.error("Error marking notification as read in Navbar", e);
-    }
+    updateNotifMutation.mutate({ id, data: { is_read: true, read: true } });
   };
 
   const markAllAsRead = () => {
     try {
-      const storedNotifs = localStorage.getItem("doc_tracking_notifications");
-      let allNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
-      const userDept = (currentUser?.mainRole || currentUser?.department || "").toLowerCase().trim();
-      const updated = allNotifs.map(n => {
-        const target = (n.targetDepartment || "").toLowerCase().trim();
-        const matches = target === userDept ||
-          (userDept === "itc" && target.includes("information technology")) ||
-          (userDept === "acc" && target.includes("accounting")) ||
-          (userDept === "inventory" && target.includes("inventory"));
-        if (userDept === "global" || matches) {
-          return { ...n, read: true };
+      notifications.forEach(n => {
+        if (!n.read && !n.is_read) {
+          updateNotifMutation.mutate({ id: n.id, data: { is_read: true, read: true } });
         }
-        return n;
       });
-      localStorage.setItem("doc_tracking_notifications", JSON.stringify(updated));
-      window.dispatchEvent(new Event("notifications_updated"));
     } catch (e) {
       console.error("Error marking all notifications as read in Navbar", e);
     }
@@ -394,7 +423,7 @@ export default function Navbar({
                             <p className="text-[11.5px] text-gray-700 dark:text-gray-300 mt-1 font-bold line-clamp-1 leading-normal group-hover/item:text-green-600 dark:group-hover/item:text-[#34d399] transition-colors">
                               {notif.subject}
                             </p>
-                            <p className="text-[10.5px] text-gray-500 dark:text-gray-450 mt-0.5 line-clamp-2 leading-relaxed">
+                            <p className="text-[10.5px] text-gray-500 dark:text-gray-450 mt-0.5 line-clamp-2 leading-relaxed whitespace-pre-line">
                               {notif.details}
                             </p>
                             <span className="block text-[9.5px] text-gray-400 dark:text-gray-500 font-medium mt-1.5">
@@ -477,7 +506,7 @@ export default function Navbar({
                       {currentUser.department || currentUser.mainRole || "N/A"}
                     </div>
                     <div className="text-[15px] font-bold text-gray-900 dark:text-gray-200 tracking-wide uppercase truncate">
-                      {getEnglishName(currentUser.firstName ? `${currentUser.lastName} ${currentUser.firstName}` : currentUser.username)}
+                      {getEnglishName(language === 'kh' ? (currentUser.fullname_kh || currentUser.fullname_en || currentUser.username) : (currentUser.fullname_en || currentUser.fullname_kh || currentUser.username))}
                     </div>
                     <div className="text-[10px] font-bold text-[#1a5b28] dark:text-[#34d399] uppercase mt-0.5 truncate">
                       {currentUser.role || "N/A"}
@@ -517,6 +546,14 @@ export default function Navbar({
                 </button>
               </div>
               <div className="w-full h-px bg-gray-100 dark:bg-[#2A2F3A] mb-4" />
+              {/* Delegation Settings */}
+              <button
+                onClick={handleOpenDelegation}
+                className="flex items-center justify-center gap-2.5 w-full py-2.5 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl transition-colors mb-2"
+              >
+                <User size={16} strokeWidth={2.5} />
+                <span className="text-[12px] font-bold tracking-wider uppercase">Out of Office / Delegate</span>
+              </button>
               {/* Sign out */}
               <button
                 onClick={handleLogout}
@@ -572,6 +609,84 @@ export default function Navbar({
           >
             <X size={16} />
           </button>
+        </div>
+      )}
+      
+      {/* Delegation Modal */}
+      {isDelegationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button
+              onClick={() => setIsDelegationModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 dark:border-[#2A2F3A] pb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                <User size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Delegation Settings</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Temporarily transfer your approval rights</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Delegate To (User Email)</label>
+                <select
+                  value={delegateToEmail}
+                  onChange={(e) => setDelegateToEmail(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">-- No Delegation (Cancel) --</option>
+                  {users
+                    .filter(u => u.department === currentUser?.department && u.email !== currentUser?.email)
+                    .map(u => (
+                      <option key={u.id} value={u.email}>
+                        {u.fullname_en || u.username} ({u.role})
+                      </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={delegateStartDate}
+                    onChange={(e) => setDelegateStartDate(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={delegateEndDate}
+                    onChange={(e) => setDelegateEndDate(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-[#0F1117] border border-gray-200 dark:border-[#2A2F3A] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-8">
+              <button
+                onClick={() => setIsDelegationModalOpen(false)}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDelegation}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+              >
+                Save Settings
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </header>

@@ -10,7 +10,7 @@ class DocumentVersion extends Model
     use HasFactory;
 
     protected $table = "document_versions";
-    
+
     protected $primaryKey = "document_version_id";
 
     public $timestamps = false;
@@ -27,11 +27,15 @@ class DocumentVersion extends Model
         "created_at"
     ];
 
-    public function document(){
+    public function document()
+    {
         return $this->belongsTo(Document::class, "document_id", "document_id");
     }
-    
-    public function uploader(){
+
+    public function uploadedBy()
+    {
         return $this->belongsTo(User::class, "uploaded_by", "user_id");
     }
+
+
 }

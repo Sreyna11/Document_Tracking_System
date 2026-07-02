@@ -7,6 +7,9 @@ import { Bell, Inbox, FileText, Calendar, CheckCircle2, X, AlertCircle, ImageIco
 import AlertModal from "../../../components/AlertModal";
 import { useLanguage } from "../../context/LanguageContext";
 import { useSidebar } from "../../context/SidebarContext";
+import { useAccounts } from '../../../hooks/useAccounts';
+import { useDocuments } from '../../../hooks/useDocuments';
+import { useNotifications, useUpdateNotification } from '../../../hooks/useNotifications';
 
 const getEnglishName = (name) => {
   if (!name) return "";
@@ -34,12 +37,15 @@ export default function NotificationPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [allRequests, setAllRequests] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  // Alert Modal State
   const [alertModal, setAlertModal] = useState({ isOpen: false, message: "" });
   const showAlert = (message) => setAlertModal({ isOpen: true, message });
+
+  const { data: users = [] } = useAccounts();
+  const { data: allRequests = [] } = useDocuments();
+  const { data: notificationsData = [] } = useNotifications();
+  const updateMutation = useUpdateNotification();
+
   useEffect(() => {
     const userStr = sessionStorage.getItem("currentUser");
     if (!userStr) {
@@ -48,108 +54,86 @@ export default function NotificationPage() {
       setCurrentUser(JSON.parse(userStr));
       setIsMounted(true);
     }
-    // Load users for photos
-    try {
-      const storedUsers = localStorage.getItem("doc_tracking_users");
-      if (storedUsers) {
-        setUsers(JSON.parse(storedUsers));
-      }
-      const storedReqs = localStorage.getItem("doc_tracking_requests");
-      if (storedReqs) {
-        setAllRequests(JSON.parse(storedReqs));
-      }
-    } catch (e) {
-      console.error(e);
-    }
   }, []);
   useEffect(() => {
-    if (!currentUser) return;
-    const loadNotifications = (storageData) => {
-      try {
-        let allNotifs = storageData ? JSON.parse(storageData) : [];
+    if (!currentUser || !notificationsData) return;
+    try {
+        const allNotifs = Array.isArray(notificationsData) ? notificationsData.map(n => {
+          let dateStr = "";
+          let timeStr = "";
+          if (n.created_at || n.date) {
+            const d = new Date(n.created_at || n.date);
+            if (!isNaN(d.getTime())) {
+              dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+              timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            }
+          }
+          return {
+            ...n,
+            id: n.notification_id || n.id,
+            targetDepartment: n.target_department || n.targetDepartment,
+            senderName: n.sender_name || n.senderName,
+            senderDepartment: n.sender_department || n.senderDepartment,
+            requestId: n.document_id || n.requestId,
+            read: n.is_read || n.read,
+            date: dateStr || n.date,
+            time: timeStr || n.time,
+          };
+        }) : [];
         const userDept = (currentUser.department || currentUser.mainRole || "").toLowerCase().trim();
         let myNotifs = allNotifs.filter(n => {
           if (userDept === "global") return true;
-          const target = (n.targetDepartment || "").toLowerCase().trim();
+          
+          const target = (n.target_department || n.targetDepartment || "").toLowerCase().trim();
+          
+          const now = new Date();
+          now.setHours(0,0,0,0);
+          const hasDelegation = users.some(u => {
+              const uDept = (u.mainRole || u.department || "").toLowerCase().trim();
+              if (uDept !== target || !u.delegation || !u.delegation.isActive) return false;
+              if (u.delegation.delegateToEmail !== currentUser?.email) return false;
+              const start = new Date(u.delegation.startDate);
+              const end = new Date(u.delegation.endDate);
+              end.setHours(23,59,59,999);
+              return start <= new Date() && end >= now;
+          });
+
           return target === userDept ||
             (userDept === "itc" && target.includes("information technology")) ||
             (userDept === "acc" && target.includes("accounting")) ||
-            (userDept === "inventory" && target.includes("inventory"));
+            (userDept === "inventory" && target.includes("inventory")) ||
+            hasDelegation;
         });
         setNotifications(myNotifs);
-      } catch (e) {
+    } catch (e) {
         console.error(e);
-      }
-    };
-    // Initial load
-    loadNotifications(localStorage.getItem("doc_tracking_notifications"));
-    // Real-time tracking without refresh
-    const handleStorageChange = (e) => {
-      if (e.key === "doc_tracking_notifications") {
-        loadNotifications(e.newValue);
-      }
-      if (e.key === "doc_tracking_requests" && e.newValue) {
-        setAllRequests(JSON.parse(e.newValue));
-      }
-    };
-    const handleLocalUpdate = () => {
-      loadNotifications(localStorage.getItem("doc_tracking_notifications"));
-    };
-    window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("notifications_updated", handleLocalUpdate);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("notifications_updated", handleLocalUpdate);
-    };
-  }, [currentUser]);
+    }
+  }, [currentUser, notificationsData]);
   const getSenderPhoto = (senderName) => {
     if (!senderName || users.length === 0) return null;
     const sName = getEnglishName(senderName).toLowerCase().trim();
     const match = users.find(
       (u) => {
-        const uFirstLast = getEnglishName(`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim();
+        const fEn = getEnglishName(u.fullname_en || "").toLowerCase().trim();
+        const fKh = getEnglishName(u.fullname_kh || "").toLowerCase().trim();
         const uUser = getEnglishName(u.username || "").toLowerCase().trim();
-        return uFirstLast === sName || uUser === sName || 
-               (`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim() === senderName.toLowerCase().trim() ||
+        return fEn === sName || fKh === sName || uUser === sName || 
+               (u.fullname_en || "").toLowerCase().trim() === senderName.toLowerCase().trim() ||
+               (u.fullname_kh || "").toLowerCase().trim() === senderName.toLowerCase().trim() ||
                (u.username || "").toLowerCase().trim() === senderName.toLowerCase().trim();
       }
     );
     return match ? match.profilePhoto : null;
   };
   const markAsRead = (id) => {
-    try {
-      const storedNotifs = localStorage.getItem("doc_tracking_notifications");
-      let allNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
-      const updated = allNotifs.map(n => n.id === id ? { ...n, read: true } : n);
-      localStorage.setItem("doc_tracking_notifications", JSON.stringify(updated));
-      setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
-      window.dispatchEvent(new Event("notifications_updated"));
-    } catch (e) {
-      console.error(e);
-    }
+    updateMutation.mutate({ id, data: { is_read: true } });
   };
   const markAllAsRead = () => {
-    try {
-      const storedNotifs = localStorage.getItem("doc_tracking_notifications");
-      let allNotifs = storedNotifs ? JSON.parse(storedNotifs) : [];
-      const userDept = (currentUser.department || currentUser.mainRole || "").toLowerCase().trim();
-      const updated = allNotifs.map(n => {
-        const target = (n.targetDepartment || "").toLowerCase().trim();
-        const matches = target === userDept ||
-          (userDept === "itc" && target.includes("information technology")) ||
-          (userDept === "acc" && target.includes("accounting")) ||
-          (userDept === "inventory" && target.includes("inventory"));
-        if (userDept === "global" || matches) {
-          return { ...n, read: true };
+    notifications.forEach(n => {
+        if (!n.is_read && !n.read) {
+            updateMutation.mutate({ id: n.notification_id || n.id, data: { is_read: true } });
         }
-        return n;
-      });
-      localStorage.setItem("doc_tracking_notifications", JSON.stringify(updated));
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
-      window.dispatchEvent(new Event("notifications_updated"));
-    } catch (e) {
-      console.error(e);
-    }
+    });
   };
   if (!isMounted) {
     return (
@@ -158,7 +142,7 @@ export default function NotificationPage() {
       </div>
     );
   }
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.read && !n.is_read).length;
   // File Helpers
   const getFileExtension = (filename) => {
     if (!filename) return "";
@@ -257,10 +241,10 @@ export default function NotificationPage() {
                   <div
                     key={notif.id}
                     onClick={() => {
-                      if (!notif.read) markAsRead(notif.id);
+                      if (!notif.read && !notif.is_read) markAsRead(notif.notification_id || notif.id);
                       if (notif.requestId) router.push(`/content/receive?id=${notif.requestId}`);
                     }}
-                    className={`bg-white dark:bg-[#0B0D12] border rounded-2xl p-5 flex items-start md:items-center justify-between shadow-xs transition-all duration-300 gap-4 cursor-pointer hover:shadow-md ${!notif.read ? "border-l-4 border-l-green-500 border-gray-200 dark:border-gray-700 dark:border-l-green-500 bg-green-50/30 dark:bg-green-500/5" : "border-gray-100 dark:border-[#2A2F3A] hover:border-green-600/30 dark:hover:border-green-500/30"
+                    className={`bg-white dark:bg-[#0B0D12] border rounded-2xl p-5 flex items-start md:items-center justify-between shadow-xs transition-all duration-300 gap-4 cursor-pointer hover:shadow-md ${!(notif.read || notif.is_read) ? "border-l-4 border-l-green-500 border-gray-200 dark:border-gray-700 dark:border-l-green-500 bg-green-50/30 dark:bg-green-500/5" : "border-gray-100 dark:border-[#2A2F3A] hover:border-green-600/30 dark:hover:border-green-500/30"
                       }`}
                   >
                     <div className="flex flex-col md:flex-row md:items-center gap-5 flex-1 min-w-0">
@@ -282,7 +266,7 @@ export default function NotificationPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="text-[17px] font-bold text-gray-800 dark:text-gray-200 truncate">{getLocalizedName(notif.senderName, language)}</h3>
-                          {!notif.read && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                          {!(notif.read || notif.is_read) && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
                           {(notif.priorityLevel || "Normal") && (
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${(notif.priorityLevel || "").toLowerCase() === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20' :
                                 (notif.priorityLevel || "").toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20' :
@@ -297,7 +281,7 @@ export default function NotificationPage() {
                           <FileText size={14} className="text-green-600 dark:text-[#34d399] flex-shrink-0 mt-0.5" />
                           <span className="leading-tight">{notif.subject}</span>
                         </p>
-                        <p className="text-[12px] text-gray-500 dark:text-[#a1a1aa] mt-1 pl-5">
+                        <p className="text-[12px] text-gray-500 dark:text-[#a1a1aa] mt-1 pl-5 whitespace-pre-line">
                           {notif.details}
                         </p>
                       </div>
@@ -309,7 +293,7 @@ export default function NotificationPage() {
                           <Calendar size={12} className="text-green-650 dark:text-[#4ade80]" />
                           {notif.date} • {notif.time}
                         </div>
-                        {!notif.read && (
+                        {!(notif.read || notif.is_read) && (
                           <div className="flex-shrink-0 pt-0.5">
                             <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/20">
                               {t('new')}

@@ -24,8 +24,8 @@ class JobDepartmentController extends Controller
                 'status' => $dept->status,
                 'roles' => $dept->roles->map(function ($role) {
                     return [
-                        'id' => $role->role_id,
-                        'title' => $role->role_name,
+                        'id' => $role->id,
+                        'title' => $role->name,
                         'slug' => $role->slug,
                         'level' => $role->level,
                         'type' => $role->type,
@@ -65,21 +65,13 @@ class JobDepartmentController extends Controller
         if (!empty($validated['roles'])) {
             foreach ($validated['roles'] as $roleData) {
                 $newRole = $department->roles()->create([
-                    'role_name' => $roleData['title'],
+                    'name' => $roleData['title'],
+                    'guard_name' => 'web',
                     'slug' => $roleData['slug'] ?? null,
                     'level' => $roleData['level'] ?? null,
                     'type' => $roleData['type'] ?? null,
                     'description' => $roleData['coreFunction'] ?? null,
-                    'permissions' => [] // Will be populated below
                 ]);
-                
-                // Inherit permissions if type exists
-                if (!empty($roleData['type'])) {
-                    $deptPermissions = is_string($department->role_permissions) ? json_decode($department->role_permissions, true) : ($department->role_permissions ?? []);
-                    if (isset($deptPermissions[$roleData['type']])) {
-                        $newRole->update(['permissions' => $deptPermissions[$roleData['type']]]);
-                    }
-                }
             }
         }
 
@@ -116,12 +108,12 @@ class JobDepartmentController extends Controller
         // We delete roles that are not in the payload and update/create the rest.
         // For simplicity, since the frontend sends the full array, we can delete missing ones.
         if (isset($validated['roles'])) {
-            $existingRoleIds = $department->roles()->pluck('role_id')->toArray();
+            $existingRoleIds = $department->roles()->pluck('id')->toArray();
             $incomingRoleIds = array_filter(array_column($validated['roles'], 'id'), 'is_numeric');
 
             $rolesToDelete = array_diff($existingRoleIds, $incomingRoleIds);
             if (!empty($rolesToDelete)) {
-                Role::whereIn('role_id', $rolesToDelete)->delete();
+                Role::whereIn('id', $rolesToDelete)->delete();
             }
 
             foreach ($validated['roles'] as $roleData) {
@@ -129,7 +121,7 @@ class JobDepartmentController extends Controller
                     $role = Role::find($roleData['id']);
                     if ($role) {
                         $role->update([
-                            'role_name' => $roleData['title'],
+                            'name' => $roleData['title'],
                             'slug' => $roleData['slug'] ?? null,
                             'level' => $roleData['level'] ?? null,
                             'type' => $roleData['type'] ?? null,
@@ -138,21 +130,13 @@ class JobDepartmentController extends Controller
                     }
                 } else {
                     $newRole = $department->roles()->create([
-                        'role_name' => $roleData['title'],
+                        'name' => $roleData['title'],
+                        'guard_name' => 'web',
                         'slug' => $roleData['slug'] ?? null,
                         'level' => $roleData['level'] ?? null,
                         'type' => $roleData['type'] ?? null,
                         'description' => $roleData['coreFunction'] ?? null,
-                        'permissions' => [] // Will be populated below
                     ]);
-                    
-                    // Inherit permissions if type exists
-                    if (!empty($roleData['type'])) {
-                        $deptPermissions = is_string($department->role_permissions) ? json_decode($department->role_permissions, true) : ($department->role_permissions ?? []);
-                        if (isset($deptPermissions[$roleData['type']])) {
-                            $newRole->update(['permissions' => $deptPermissions[$roleData['type']]]);
-                        }
-                    }
                 }
             }
         } else {

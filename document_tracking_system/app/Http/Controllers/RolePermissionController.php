@@ -77,9 +77,24 @@ class RolePermissionController extends Controller
         $dept->save();
 
         // Cascade permissions to all existing roles of this type in this department
-        Role::where('department_id', $dept->department_id)
+        $roles = Role::where('department_id', $dept->department_id)
             ->where('type', $request->type)
-            ->update(['permissions' => json_encode($request->input('permissions'))]);
+            ->get();
+            
+        $spatiePermissionNames = [];
+        foreach ($request->input('permissions') as $menu => $actions) {
+            foreach ($actions as $action => $value) {
+                if ($value === true) {
+                    $name = "{$action} {$menu}";
+                    \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+                    $spatiePermissionNames[] = $name;
+                }
+            }
+        }
+
+        foreach ($roles as $role) {
+            $role->syncPermissions($spatiePermissionNames);
+        }
 
         return response()->json([
             'message' => 'Permissions updated successfully',

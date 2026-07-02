@@ -16,7 +16,8 @@ class DocumentType extends Model
         "name",
         "description",
         "requires_approval",
-        "retention_day",
+        "retention_days",
+        "status",
         "created_at"
      ];
 

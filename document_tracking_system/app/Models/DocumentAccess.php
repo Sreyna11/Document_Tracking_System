@@ -22,19 +22,24 @@ class DocumentAccess extends Model
         "expires_at"
     ];
 
-    public function document(){
+    public function document()
+    {
         return $this->belongsTo(Document::class, "document_id", "document_id");
     }
 
-    public function user(){
+    public function user()
+    {
         return $this->belongsTo(User::class, "user_id", "user_id");
     }
 
-    public function department(){
+    public function department()
+    {
         return $this->belongsTo(Department::class, "department_id", "department_id");
     }
 
-    public function grantedBy(){
+    public function grantedBy()
+    {
         return $this->belongsTo(User::class, "granted_by", "user_id");
     }
 }
+

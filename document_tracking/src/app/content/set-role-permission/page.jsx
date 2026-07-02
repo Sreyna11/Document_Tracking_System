@@ -115,6 +115,12 @@ export default function SetRolePermissionPage() {
           formattedData = [];
         }
 
+        const isSuperAdmin = user?.email === "admin@rupp.edu.kh" || user?.email === "itcsuperadmin@rupp.edu.kh";
+        if (!isSuperAdmin) {
+            const userDept = (user?.mainRole || user?.department || "").toLowerCase().trim();
+            formattedData = formattedData.filter(d => (d.name || d.department || "").toLowerCase().trim() === userDept);
+        }
+
         setDepartmentsData(formattedData);
         const newExpanded = {};
         formattedData.forEach(d => { newExpanded[d.name] = true; });
