@@ -375,8 +375,12 @@ export default function JobDepartmentPage() {
                                 {dept.userSignature ? dept.userSignature.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim() : ''}
                               </td>
                               <td className="text-[14px] py-4 px-4">
-                                <span className={`inline-flex items-center justify-center px-3 py-1 text-[11px] font-bold rounded-sm ${dept.status === 'Active' ? 'bg-[#8ee093] text-[#0c4015]' : 'bg-gray-300 text-gray-700'}`}>
-                                  {dept.status === 'Active' ? t("active") || "Active" : t("inactive") || "Inactive"}
+                                <span className={`inline-flex items-center justify-center px-4 py-1 text-[11px] font-bold uppercase rounded-full border ${
+                                  dept.status === 'Active' 
+                                    ? 'bg-[#f0fdf4] text-[#15803d] border-[#bbf7d0]' 
+                                    : 'bg-gray-50 text-gray-600 border-gray-200'
+                                }`}>
+                                  {dept.status === 'Active' ? "ACTIVE" : "INACTIVE"}
                                 </span>
                               </td>
                               <td className={`py-3 px-4 relative ${actionMenuOpen === dept.id ? 'z-30' : ''}`}>

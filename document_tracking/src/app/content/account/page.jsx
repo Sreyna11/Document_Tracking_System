@@ -16,6 +16,7 @@ import {
   Phone,
   Users,
   Eye,
+  EyeOff,
   Edit,
   Plus,
   CheckCircle,
@@ -32,9 +33,12 @@ import SearchableSelect from "../../../components/SearchableSelect";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const fetchWithAuth = (url, options = {}) => {
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem("auth_token") : null;
   return fetch(url, {
     ...options,
     headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'Accept': 'application/json',
       ...options.headers,
     }
   });
@@ -92,7 +96,20 @@ export default function AccountPage() {
         if (sessionUser.id === id || sessionUser.email === payload.email.trim()) {
           const res = await fetchWithAuth('http://document_tracking_system.test/api/me');
           if (res.ok) {
-            const updatedSession = await res.json();
+            const data = await res.json();
+            const u = data.user || data;
+            const updatedSession = {
+              username: u.fullname_en || u.username || u.fullname_kh,
+              fullname_en: u.fullname_en,
+              fullname_kh: u.fullname_kh,
+              email: u.email,
+              role: u.role || "Staff",
+              type: u.type || "Staff",
+              department: u.department?.name || "Global",
+              permissions: u.menu_permissions || {},
+              profilePhoto: u.profile_photo || null,
+              signaturePhoto: u.signature_photo || null
+            };
             sessionStorage.setItem("currentUser", JSON.stringify(updatedSession));
           }
         }
@@ -158,6 +175,7 @@ export default function AccountPage() {
   // View state: 'LIST', 'CREATE', 'VIEW'
   const [viewState, setViewState] = useState('LIST');
   const [selectedUserView, setSelectedUserView] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(null);
   // Edit State
   const [isEditMode, setIsEditMode] = useState(false);
@@ -232,8 +250,8 @@ export default function AccountPage() {
     if (isMounted && !canViewAny && viewState === 'LIST' && usersList.length > 0) {
       const me = usersList.find(u => u.email === currentUser?.email) || {
         ...currentUser,
-        firstName: currentUser?.username?.split(' ')[0] || currentUser?.username || '',
-        lastName: currentUser?.username?.split(' ').slice(1).join(' ') || ''
+        fullname_en: currentUser?.fullname_en || currentUser?.username || '',
+        fullname_kh: currentUser?.fullname_kh || currentUser?.username || ''
       };
       setSelectedUserView(me);
       setViewState('VIEW');
@@ -304,31 +322,98 @@ export default function AccountPage() {
       reader.readAsDataURL(file);
     }
   };
+  const autoCropImage = (dataUrl, callback) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+      let isTransparent = true;
+
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const alpha = data[(y * canvas.width + x) * 4 + 3];
+          const r = data[(y * canvas.width + x) * 4];
+          const g = data[(y * canvas.width + x) * 4 + 1];
+          const b = data[(y * canvas.width + x) * 4 + 2];
+          
+          if (alpha > 10 && (r < 250 || g < 250 || b < 250)) {
+            isTransparent = false;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (isTransparent) {
+        callback(dataUrl);
+        return;
+      }
+
+      const padding = 10;
+      minX = Math.max(0, minX - padding);
+      minY = Math.max(0, minY - padding);
+      maxX = Math.min(canvas.width, maxX + padding);
+      maxY = Math.min(canvas.height, maxY + padding);
+
+      const croppedWidth = maxX - minX;
+      const croppedHeight = maxY - minY;
+
+      const croppedCanvas = document.createElement('canvas');
+      croppedCanvas.width = croppedWidth;
+      croppedCanvas.height = croppedHeight;
+      const croppedCtx = croppedCanvas.getContext('2d');
+      
+      croppedCtx.drawImage(canvas, minX, minY, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
+      callback(croppedCanvas.toDataURL('image/png'));
+    };
+    img.src = dataUrl;
+  };
+
   const handleSignatureUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSignaturePhoto(reader.result);
+        autoCropImage(reader.result, (croppedDataUrl) => {
+          setSignaturePhoto(croppedDataUrl);
+        });
       };
       reader.readAsDataURL(file);
     }
   };
-  const handleEditClick = (user) => {
-    setIsEditMode(true);
-    setEditingUserId(user.id);
-    setFullname_kh(user.fullname_kh || "");
-    setFullname_en(user.fullname_en || "");
-    setEmail(user.email || "");
-    setPhone(user.phone || "");
-    setPassword(user.password || "");
-    setSelectedMainRole(user.mainRole || user.department || "");
-    setSelectedRole(user.role || "");
-    setSelectedType(user.type || "");
-    setProfilePhoto(user.profilePhoto || null);
-    setSignaturePhoto(user.signaturePhoto || null);
-    setStatus(user.status || "Active");
-    setViewState('CREATE');
+  const handleEditClick = async (user) => {
+    try {
+      const res = await fetchWithAuth(`http://document_tracking_system.test/api/accounts/${user.id}`);
+      if (!res.ok) throw new Error("Failed to fetch user");
+      const fullUser = await res.json();
+      
+      setIsEditMode(true);
+      setEditingUserId(fullUser.id);
+      setFullname_kh(fullUser.fullname_kh || "");
+      setFullname_en(fullUser.fullname_en || "");
+      setEmail(fullUser.email || "");
+      setPhone(fullUser.phone || "");
+      setPassword(""); // Password typically not returned
+      setSelectedMainRole(fullUser.mainRole || fullUser.department || "");
+      setSelectedRole(fullUser.role || "");
+      setSelectedType(fullUser.type || "");
+      setProfilePhoto(fullUser.profilePhoto || null);
+      setSignaturePhoto(fullUser.signaturePhoto || null);
+      setStatus(fullUser.status || "Active");
+      setViewState('CREATE');
+    } catch (e) {
+      console.error(e);
+      showAlert("Error fetching user details.");
+    }
   };
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -374,6 +459,23 @@ export default function AccountPage() {
   const handleSelectAll = () => {
     setSelectedRows(paginatedUsers.map(u => u.id));
   };
+  const handleConnectTelegram = async () => {
+    try {
+      const res = await fetchWithAuth('http://document_tracking_system.test/api/telegram/generate-token', {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const botUsername = data.bot_username || "MyDocTrackingBot";
+        window.open(`https://t.me/${botUsername}?start=${data.token}`, '_blank');
+      } else {
+        showAlert("Failed to generate Telegram token.");
+      }
+    } catch (e) {
+      console.error(e);
+      showAlert("Error connecting to Telegram.");
+    }
+  };
   const handleDeselectAll = () => {
     setSelectedRows([]);
   };
@@ -409,7 +511,8 @@ export default function AccountPage() {
     }
     const searchLower = searchTerm.toLowerCase();
     return (
-      `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchLower) ||
+      (user.fullname_en || "").toLowerCase().includes(searchLower) ||
+      (user.fullname_kh || "").toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
       (user.mainRole || user.department || "").toLowerCase().includes(searchLower) ||
       (user.role || "").toLowerCase().includes(searchLower)
@@ -551,7 +654,19 @@ export default function AccountPage() {
                                         <div className={`absolute right-0 w-32 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-[#2A2F3A] rounded-lg shadow-xl z-50 overflow-hidden py-1 ${(idx === paginatedUsers.length - 1 || (idx === paginatedUsers.length - 2 && paginatedUsers.length >= 3)) ? 'bottom-full mb-1' : 'top-full mt-1'
                                           }`}>
                                           <button
-                                            onClick={() => { setActionMenuOpen(null); setSelectedUserView(user); setViewState('VIEW'); }}
+                                            onClick={async () => {
+                                              setActionMenuOpen(null);
+                                              try {
+                                                const res = await fetchWithAuth(`http://document_tracking_system.test/api/accounts/${user.id}`);
+                                                if (!res.ok) throw new Error("Failed to fetch user");
+                                                const fullUser = await res.json();
+                                                setSelectedUserView(fullUser);
+                                                setViewState('VIEW');
+                                              } catch (e) {
+                                                console.error(e);
+                                                showAlert("Error fetching user details.");
+                                              }
+                                            }}
                                             className="w-full text-left px-4 py-2 text-[13px] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#242B36] dark:bg-[#242B36] flex items-center gap-2 transition-colors"
                                           >
                                             <Eye size={14} /> {t("view")}
@@ -868,6 +983,15 @@ export default function AccountPage() {
                           {t("back")}
                         </button>
                       )}
+                      {currentUser?.email === selectedUserView.email && (
+                        <button
+                          onClick={handleConnectTelegram}
+                          className="px-6 py-2 bg-[#229ED9] hover:bg-[#1E8BBF] text-white text-[14px] font-medium rounded-md transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.03-1.84 1.18-5.21 3.45-.49.33-.94.5-1.35.49-.45-.01-1.32-.26-1.96-.46-.79-.26-1.42-.4-1.36-.84.03-.22.34-.45.92-.68 3.58-1.56 5.96-2.58 7.15-3.08 3.4-1.42 4.11-1.67 4.57-1.68.1 0 .32.02.46.13.12.09.15.22.16.32.01.12 0 .25-.01.35z"/></svg>
+                          Connect Telegram
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row gap-6">
@@ -900,11 +1024,11 @@ export default function AccountPage() {
                           {/* Row 1 */}
                           <div>
                             <div className="text-[15px] font-bold text-black dark:text-white mb-1">Fullname (KM)</div>
-                            <div className="text-[#1a5b28] text-[15px]">{selectedUserView.firstName}</div>
+                            <div className="text-[#1a5b28] text-[15px]">{selectedUserView.fullname_kh || "-"}</div>
                           </div>
                           <div>
                             <div className="text-[15px] font-bold text-black dark:text-white mb-1">Fullname (EN)</div>
-                            <div className="text-[#1a5b28] text-[15px]">{selectedUserView.lastName}</div>
+                            <div className="text-[#1a5b28] text-[15px]">{selectedUserView.fullname_en || "-"}</div>
                           </div>
                           <div>
                             <div className="text-[15px] font-bold text-black dark:text-white mb-1">Phone</div>
@@ -917,14 +1041,23 @@ export default function AccountPage() {
                           </div>
                           <div>
                             <div className="text-[15px] font-bold text-black dark:text-white mb-1">Password</div>
-                            <div className="text-[#1a5b28] text-[15px]">{selectedUserView.password || "********"}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-[#1a5b28] text-[15px] tracking-wide">{showPassword ? "Encrypted" : "••••••••"}</div>
+                              <button onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-[#1a5b28] transition-colors cursor-pointer" title="Passwords are encrypted for security">
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
                           </div>
                           {/* Row 3 */}
                           <div className="col-span-3">
                             <div className="text-[15px] font-bold text-black dark:text-white mb-1.5">Status</div>
-                            <div className="inline-block px-4 py-1 bg-[#60b968] text-white text-[12px] font-bold rounded shadow-sm">
-                              {selectedUserView.status || "Active"}
-                            </div>
+                            <span className={`inline-flex items-center justify-center px-4 py-1 text-[11px] font-bold uppercase rounded-full border ${
+                              (!selectedUserView.status || selectedUserView.status === 'Active') 
+                                ? 'bg-[#f0fdf4] text-[#15803d] border-[#bbf7d0]' 
+                                : 'bg-gray-50 text-gray-600 border-gray-200'
+                            }`}>
+                              {(!selectedUserView.status || selectedUserView.status === 'Active') ? "ACTIVE" : "INACTIVE"}
+                            </span>
                           </div>
                         </div>
                       </div>

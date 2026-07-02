@@ -28,7 +28,7 @@ class Document extends Model
         "metadata",
         "created_at",
         "updated_at",
-        "expire_at"
+        "expires_at"
     ];
 
     public function documentVersions()

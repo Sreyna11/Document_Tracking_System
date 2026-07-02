@@ -12,10 +12,11 @@ class DocumentTag extends Model
     protected $table = "document_tags";
 
     protected $primaryKey= "document_id";
+    public $incrementing = false;
 
     public $timestamps = false;
     
-    protected $fillable = ['tag_id'];
+    protected $fillable = ['document_id', 'tag_id'];
 
     public function tag(){
         return $this->belongsTo(Tag::class,"tag_id","tag_id");

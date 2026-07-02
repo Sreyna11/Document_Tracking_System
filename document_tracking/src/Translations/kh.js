@@ -10,6 +10,8 @@ export const km = {
   "role": "តួនាទី",
   "create_user": "បង្កើតអ្នកប្រើប្រាស់",
   "type_document": "ប្រភេទឯកសារ",
+  "requires_approval": "ទាមទារការយល់ព្រម",
+  "retention_days": "ថ្ងៃរក្សាទុក",
   "sign_out": "ចាកចេញ",
   "search_placeholder": "ស្វែងរកឯកសារតាមលេខតាមដាន...",
   "checking_credentials": "កំពុងពិនិត្យមើលសិទ្ធិ...",
@@ -444,5 +446,7 @@ export const km = {
   "approve": "អនុម័ត",
   "select_member":"ជ្រើសរើសសមាជិក",
   "edit_user": "កែប្រែអ្នកប្រើប្រាស់",
-  "tag":"ស្លាក"
+  "tag":"ស្លាក",
+  "from_department": "ពីដេប៉ាតឺម៉ង់",
+  "to_department": "ទៅដេប៉ាតឺម៉ង់",
 }

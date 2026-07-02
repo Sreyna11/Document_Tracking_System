@@ -7,21 +7,46 @@ use App\Models\User;
 use App\Models\Department;
 use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AccountController extends Controller
 {
+    private function uploadBase64ToS3($base64String, $folder, $username)
+    {
+        if (!$base64String || !str_contains($base64String, ';base64,')) {
+            return $base64String;
+        }
+
+        @list($type, $file_data) = explode(';', $base64String);
+        @list(, $file_data) = explode(',', $file_data);
+        $file_data = base64_decode($file_data);
+
+        $extension = 'png';
+        if (str_contains($type, 'jpeg') || str_contains($type, 'jpg')) $extension = 'jpg';
+        elseif (str_contains($type, 'gif')) $extension = 'gif';
+        elseif (str_contains($type, 'svg')) $extension = 'svg';
+
+        $filename = $folder . '/' . Str::slug($username) . '_' . time() . '.' . $extension;
+        
+        Storage::disk('s3')->put($filename, $file_data);
+
+        return url('/api/documents/file/' . $filename);
+    }
+
     public function index()
     {
-        $users = User::with(['department', 'role'])->get()->map(function ($user) {
+        $users = User::with(['department', 'assignedRoles'])->get()->map(function ($user) {
             return [
                 'id' => $user->user_id,
+                'username' => $user->username,
                 'fullname_kh' => $user->fullname_kh,
                 'fullname_en' => $user->fullname_en,
                 'phone' => $user->phone,
                 'email' => $user->email,
                 'mainRole' => $user->department ? $user->department->name : null,
                 'department' => $user->department ? $user->department->name : null,
-                'role' => $user->role ? $user->role->role_name : null,
+                'role' => $user->role,
                 'type' => $user->type,
                 'profilePhoto' => $user->profile_photo,
                 'signaturePhoto' => $user->signature_photo,
@@ -34,7 +59,7 @@ class AccountController extends Controller
 
     public function show(string $id)
     {
-        $user = User::with(['department', 'role'])->findOrFail($id);
+        $user = User::with(['department', 'assignedRoles'])->findOrFail($id);
         
         return response()->json([
             'id' => $user->user_id,
@@ -44,7 +69,7 @@ class AccountController extends Controller
             'email' => $user->email,
             'mainRole' => $user->department ? $user->department->name : null,
             'department' => $user->department ? $user->department->name : null,
-            'role' => $user->role ? $user->role->role_name : null,
+            'role' => $user->role,
             'type' => $user->type,
             'profilePhoto' => $user->profile_photo,
             'signaturePhoto' => $user->signature_photo,
@@ -69,7 +94,7 @@ class AccountController extends Controller
         ]);
 
         $department = Department::where('name', $validated['department'])->first();
-        $role = Role::where('role_name', $validated['role'])
+        $role = Role::where('name', $validated['role'])
             ->when($department, function($q) use ($department) {
                 return $q->where('department_id', $department->department_id);
             })->first();
@@ -82,12 +107,17 @@ class AccountController extends Controller
             'email' => $validated['email'],
             'password_hash' => Hash::make($validated['password']),
             'department_id' => $department ? $department->department_id : null,
-            'role_id' => $role ? $role->role_id : null,
+            'role' => $validated['role'] ?? null,
             'type' => $validated['type'] ?? null,
-            'profile_photo' => $validated['profilePhoto'] ?? null,
-            'signature_photo' => $validated['signaturePhoto'] ?? null,
+            'profile_photo' => $this->uploadBase64ToS3($validated['profilePhoto'] ?? null, 'avatars', $validated['fullname_en']),
+            'signature_photo' => $this->uploadBase64ToS3($validated['signaturePhoto'] ?? null, 'signatures', $validated['fullname_en']),
             'is_active' => ($validated['status'] ?? 'Active') === 'Active' ? true : false,
         ]);
+
+        if ($role && $department) {
+            setPermissionsTeamId($department->department_id);
+            $user->assignRole($role);
+        }
 
         return response()->json(['message' => 'User created successfully', 'user_id' => $user->user_id]);
     }
@@ -111,7 +141,7 @@ class AccountController extends Controller
         ]);
 
         $department = Department::where('name', $validated['department'])->first();
-        $role = Role::where('role_name', $validated['role'])
+        $role = Role::where('name', $validated['role'])
             ->when($department, function($q) use ($department) {
                 return $q->where('department_id', $department->department_id);
             })->first();
@@ -123,10 +153,10 @@ class AccountController extends Controller
             'phone' => $validated['phone'],
             'email' => $validated['email'],
             'department_id' => $department ? $department->department_id : null,
-            'role_id' => $role ? $role->role_id : null,
+            'role' => $validated['role'] ?? null,
             'type' => $validated['type'] ?? null,
-            'profile_photo' => $validated['profilePhoto'] ?? null,
-            'signature_photo' => $validated['signaturePhoto'] ?? null,
+            'profile_photo' => $this->uploadBase64ToS3($validated['profilePhoto'] ?? null, 'avatars', $validated['fullname_en']),
+            'signature_photo' => $this->uploadBase64ToS3($validated['signaturePhoto'] ?? null, 'signatures', $validated['fullname_en']),
             'is_active' => ($validated['status'] ?? 'Active') === 'Active' ? true : false,
         ];
 
@@ -135,6 +165,24 @@ class AccountController extends Controller
         }
 
         $user->update($updateData);
+
+        \App\Models\AuditLog::create([
+            'document_id' => null,
+            'user_id' => $user->user_id,
+            'action' => 'Profile Updated',
+            'action_details' => json_encode([
+                'method' => 'Web App',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'updated_by' => $request->user() ? $request->user()->username : $user->username,
+                'updated_fields' => array_keys($validated)
+            ])
+        ]);
+
+        if ($role && $department) {
+            setPermissionsTeamId($department->department_id);
+            $user->syncRoles([$role]);
+        }
 
         return response()->json(['message' => 'User updated successfully']);
     }
@@ -145,5 +193,24 @@ class AccountController extends Controller
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully']);
+    }
+
+    public function generateTelegramToken(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        // Generate a random 32-character token
+        $token = bin2hex(random_bytes(16));
+        
+        $user->telegram_link_token = $token;
+        $user->save();
+
+        return response()->json([
+            'token' => $token,
+            'bot_username' => env('TELEGRAM_BOT_USERNAME', 'MyDocTrackingBot')
+        ]);
     }
 }

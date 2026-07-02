@@ -20,6 +20,9 @@ import { useRouter } from "nextjs-toploader/app";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "../app/context/LanguageContext";
 import { hasPermission } from "../utils/permissions";
+import { useDocuments } from '../hooks/useDocuments';
+import { useAccounts } from '../hooks/useAccounts';
+import { useDepartments } from '../hooks/useDepartments';
 
 export default function Sidebar({
   isSidebarOpen,
@@ -50,6 +53,11 @@ export default function Sidebar({
   });
   const [receiveCount, setReceiveCount] = useState(0);
   const [permissionsVersion, setPermissionsVersion] = useState(0);
+  const { data: requestsData = [] } = useDocuments();
+  const requests = Array.isArray(requestsData) ? requestsData : [];
+  const { data: users = [] } = useAccounts();
+  const { data: departmentsData = [] } = useDepartments();
+  const departments = Array.isArray(departmentsData) ? departmentsData : [];
 
   const toggleMenu = (menu) => {
     setOpenMenus((prev) => {
@@ -72,51 +80,85 @@ export default function Sidebar({
 
   useEffect(() => {
     if (!currentUser) return;
+    try {
+      const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
+      const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
 
-    const calculateUnreadReceive = (storageData) => {
-      try {
-        let requests = storageData ? JSON.parse(storageData) : [];
-        if (!Array.isArray(requests)) return;
+      let list = requests.filter((req) => {
+        const status = req.status?.toLowerCase().trim();
+        
+        // Hide completed/approved documents from Receive badge (they go to History Request)
+        if (status === "completed" || status === "approved") {
+            return false;
+        }
 
-        const userDept = (currentUser.mainRole || currentUser.department || "").toLowerCase().trim();
-        const isGlobalSuperAdmin = currentUser?.email === "itcsuperadmin@rupp.edu.kh";
+        const isAssignedToMeForImprovement = status === "assigned to improve" && (req.improveAssignedTo || "").toLowerCase().trim() === userDept;
+        if (isAssignedToMeForImprovement) return true;
 
-        let list = requests.filter((req) => {
-          const isAssignedToMeForImprovement = req.status?.toLowerCase().trim() === "assigned to improve" && (req.improveAssignedTo || "").toLowerCase().trim() === userDept;
-          if (isAssignedToMeForImprovement) return true;
-          const isDeclinedToMe = req.status?.toLowerCase().trim() === "failed" && (req.senderDepartment || "").toLowerCase().trim() === userDept;
-          if (isDeclinedToMe) return true;
-          const isCompletedToMe = req.status?.toLowerCase().trim() === "completed" && (req.senderDepartment || "").toLowerCase().trim() === userDept;
-          if (isCompletedToMe) return true;
+        if ((req.senderDepartment || "").toLowerCase().trim() === userDept) return false;
+        if (isGlobalSuperAdmin) return true;
+        if (!req.path) return false;
 
-          if ((req.senderDepartment || "").toLowerCase().trim() === userDept) return false;
-          if (isGlobalSuperAdmin) return true;
-          if (!req.path) return false;
+        const myIndex = req.path.findIndex(p => {
+          const role = typeof p === 'string' ? p : p.department || p.mainRole;
+          if (!role) return false;
+          const roleNormalized = role.toLowerCase().trim();
+          
+          let isTargetUser = true;
+          let requiredUserSign = null;
 
-          const myIndex = req.path.findIndex(p => {
-            const role = typeof p === 'string' ? p : p.department || p.mainRole;
-            return role && role.toLowerCase().trim() === userDept;
+          if (p.userSign && p.userSign.trim() !== "") {
+              requiredUserSign = p.userSign;
+          } else {
+              const targetDeptObj = departments.find(d => (d.name || d.code || "").toLowerCase().trim() === roleNormalized);
+              if (targetDeptObj && targetDeptObj.userSignature && targetDeptObj.userSignature.trim() !== "") {
+                  requiredUserSign = targetDeptObj.userSignature;
+              }
+          }
+
+          if (requiredUserSign) {
+              const signName = requiredUserSign.replace(/[\u1780-\u17FF\u19E0-\u19FF\u200B]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+              const myNameEn = (currentUser?.fullname_en || "").toLowerCase().trim();
+              const myNameKh = (currentUser?.fullname_kh || "").toLowerCase().trim();
+              const myUsername = (currentUser?.username || "").toLowerCase().trim();
+              
+              if (signName !== myNameEn && signName !== myNameKh && signName !== myUsername) {
+                  isTargetUser = false;
+              }
+          }
+          
+          if (roleNormalized === userDept && isTargetUser) return true;
+
+          // Check if current user is a delegate for this role
+          const now = new Date();
+          now.setHours(0,0,0,0);
+          const hasDelegation = users.some(u => {
+              const uDept = (u.mainRole || u.department || "").toLowerCase().trim();
+              if (uDept !== roleNormalized || !u.delegation || !u.delegation.isActive) return false;
+              if (u.delegation.delegateToEmail !== currentUser.email) return false;
+              const start = new Date(u.delegation.startDate);
+              const end = new Date(u.delegation.endDate);
+              end.setHours(23,59,59,999);
+              return start <= new Date() && end >= now;
           });
-          if (myIndex === -1) return false;
-          const currentIndex = req.currentStepIndex !== undefined ? req.currentStepIndex : 0;
-          return currentIndex >= myIndex;
+          return hasDelegation;
         });
+        if (myIndex === -1) return false;
+        const currentIndex = req.currentStepIndex !== undefined ? req.currentStepIndex : 0;
+        return currentIndex === myIndex;
+      });
 
-        const userId = currentUser?.email || currentUser?.username || userDept;
-        const unreadList = list.filter(req => !(req.readBy || []).includes(userId));
+      const userId = currentUser?.email || currentUser?.username || userDept;
+      const unreadList = list.filter(req => !(req.readBy || []).includes(userId));
 
-        setReceiveCount(unreadList.length);
-      } catch (e) {
-        console.error("Error calculating unread receive", e);
-      }
-    };
+      setReceiveCount(unreadList.length);
+    } catch (e) {
+      console.error("Error calculating unread receive", e);
+    }
+  }, [currentUser, requests]);
 
-    calculateUnreadReceive(localStorage.getItem("doc_tracking_requests"));
-
+  useEffect(() => {
     const handleStorageChange = (e) => {
-      if (e.key === "doc_tracking_requests") {
-        calculateUnreadReceive(e.newValue);
-      }
       if (e.key === "doc_tracking_permissions") {
         setPermissionsVersion(v => v + 1);
       }
@@ -126,18 +168,13 @@ export default function Sidebar({
       setPermissionsVersion(v => v + 1);
     };
 
-    const interval = setInterval(() => {
-      calculateUnreadReceive(localStorage.getItem("doc_tracking_requests"));
-    }, 1000);
-
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("permissions_updated", handlePermissionsUpdate);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("permissions_updated", handlePermissionsUpdate);
-      clearInterval(interval);
     };
-  }, [currentUser]);
+  }, []);
 
   const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
   const adminCheckStr = (currentUser?.type || currentUser?.role || "").toLowerCase();
@@ -213,7 +250,7 @@ export default function Sidebar({
           {/* Notification Badges */}
           {item.name === "Receive" && receiveCount > 0 && (
             isSidebarOpen ? (
-              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[20px]">
+              <span className="ml-auto bg-red-500 text-white text-[10px] leading-none font-bold min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center">
                 {receiveCount > 99 ? '99+' : receiveCount}
               </span>
             ) : (

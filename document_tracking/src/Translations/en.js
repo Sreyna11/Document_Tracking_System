@@ -10,6 +10,8 @@ export const en = {
   "role": "Role",
   "create_user": "Create User",
   "type_document": "Type Document",
+  "requires_approval": "Requires Approval",
+  "retention_days": "Retention Days",
   "sign_out": "Log Out",
   "search_placeholder": "Search document by Tracking ID...",
   "checking_credentials": "Checking credentials...",
@@ -446,5 +448,7 @@ export const en = {
   "approve": "Approve",
   "select_member": "Select member",
   "edit_user": "Edit User",
-  "tag":"Tag"
+  "tag":"Tag",
+  "from_department": "From Department",
+  "to_department" : "To Department"
 }

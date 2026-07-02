@@ -1,11 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../context/LanguageContext";
 import { hasPermission } from "../../../utils/permissions";
 import Sidebar from "../../../components/Sidebar";
 import Navbar from "../../../components/Navbar";
-import { MapPin, Search, Check, Clock, AlertTriangle, FileText, Package, Navigation, Map as MapIcon, Play, Send } from "lucide-react";
+import { MapPin, Search, Check, Clock, AlertTriangle, FileText, Package, Navigation, Map as MapIcon, Play, Send, CheckCircle, DownloadCloud } from "lucide-react";
+import { useDocuments } from '../../../hooks/useDocuments';
+import { useAccounts } from '../../../hooks/useAccounts';
+
 const DeliveryTruckAnimation = ({ currentStep, onComplete }) => {
   useEffect(() => {
     const timer = setTimeout(onComplete, 2500);
@@ -83,16 +86,41 @@ export default function TrackingPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [requests, setRequests] = useState([]);
-  const [usersList, setUsersList] = useState([]);
+
+  const { data: requestsData = [] } = useDocuments();
+  const rawRequests = Array.isArray(requestsData) ? requestsData : [];
+  
+  const requests = useMemo(() => {
+    if (!currentUser) return [];
+    // System Admin sees all, others see only their department's requests unless they have View Any permission
+    const isGlobalSuperAdmin = currentUser?.email === "admin@rupp.edu.kh";
+
+    const myRequests = rawRequests.filter(req => {
+      if (isGlobalSuperAdmin) return true;
+      const sEmail = (req.senderEmail || "").toLowerCase().trim();
+      const uEmail = (currentUser?.email || "").toLowerCase().trim();
+      if (sEmail && uEmail && sEmail === uEmail) return true;
+
+      const sName = (req.senderName || "").toLowerCase().trim();
+      const uName = (currentUser?.username || currentUser?.name || "").toLowerCase().trim();
+      if (sName && uName && sName === uName) return true;
+
+      return false;
+    });
+    return myRequests;
+  }, [rawRequests, currentUser]);
+
+  const { data: usersList = [] } = useAccounts();
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [now, setNow] = useState(new Date());
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
   const formatDuration = (startStr, endStr) => {
     if (!startStr) return null;
     const start = new Date(startStr);
@@ -103,8 +131,8 @@ export default function TrackingPage() {
         let maxTime = start.getTime();
         selectedRequest.path.forEach(p => {
           if (p.approvedAt) {
-            const t = new Date(p.approvedAt).getTime();
-            if (!isNaN(t) && t > maxTime) maxTime = t;
+            const timeVal = new Date(p.approvedAt).getTime();
+            if (!isNaN(timeVal) && timeVal > maxTime) maxTime = timeVal;
           }
         });
         if (maxTime > start.getTime()) {
@@ -128,10 +156,12 @@ export default function TrackingPage() {
     if (mins > 0) return `${mins}m ${secs}s`;
     return `${secs}s`;
   };
+
   const getRoleString = (step) => {
     if (!step) return "Unknown";
     return typeof step === 'string' ? step : step.department || step.mainRole || "Unknown";
   };
+
   useEffect(() => {
     const userStr = sessionStorage.getItem("currentUser");
     if (!userStr) {
@@ -140,72 +170,23 @@ export default function TrackingPage() {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
       setIsMounted(true);
+      
 
-      const loadRequests = (dataStr) => {
-        try {
-          if (dataStr) {
-            const parsed = JSON.parse(dataStr);
-            if (Array.isArray(parsed)) {
-              // System Admin sees all, others see only their department's requests unless they have View Any permission
-              const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
-              const isGlobalSuperAdmin = user?.email === "admin@rupp.edu.kh";
-              const canViewAny = hasPermission(user, "Tracking Document", "View Any");
-
-              const myRequests = parsed.filter(req => {
-                const sEmail = (req.senderEmail || "").toLowerCase().trim();
-                const uEmail = (user?.email || "").toLowerCase().trim();
-                if (sEmail && uEmail && sEmail === uEmail) return true;
-
-                const sName = (req.senderName || "").toLowerCase().trim();
-                const uName = (user?.username || user?.name || "").toLowerCase().trim();
-                if (sName && uName && sName === uName) return true;
-
-                return false;
-              });
-              setRequests(myRequests);
-
-              // Select from URL id or fallback to first
-              setSelectedRequest(prev => {
-                if (!prev) {
-                  const urlParams = new URLSearchParams(window.location.search);
-                  const idFromUrl = urlParams.get("id");
-                  if (idFromUrl) {
-                    const found = myRequests.find(r => String(r.id) === idFromUrl);
-                    if (found) return found;
-                  }
-                  if (myRequests.length > 0) return myRequests[0];
-                }
-                return prev;
-              });
-            }
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      };
-      loadRequests(localStorage.getItem("doc_tracking_requests"));
-      try {
-        const usersStr = localStorage.getItem("doc_tracking_users");
-        if (usersStr) setUsersList(JSON.parse(usersStr));
-      } catch (e) {
-        console.error("Error loading users", e);
-      }
-      const handleStorageChange = (e) => {
-        if (e.key === "doc_tracking_requests") {
-          loadRequests(e.newValue);
-        }
-      };
-      const handleRequestsUpdated = () => {
-        loadRequests(localStorage.getItem("doc_tracking_requests"));
-      };
-      window.addEventListener("storage", handleStorageChange);
-      window.addEventListener("requests_updated", handleRequestsUpdated);
-      return () => {
-        window.removeEventListener("storage", handleStorageChange);
-        window.removeEventListener("requests_updated", handleRequestsUpdated);
-      };
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!selectedRequest && requests.length > 0) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const idFromUrl = urlParams.get("id");
+      if (idFromUrl) {
+        const found = requests.find(r => String(r.id) === idFromUrl);
+        if (found) setSelectedRequest(found);
+      } else {
+        setSelectedRequest(requests[0]);
+      }
+    }
+  }, [requests, selectedRequest]);
   useEffect(() => {
     if (selectedRequest) {
       const updated = requests.find(r => r.id === selectedRequest.id);
@@ -252,7 +233,7 @@ export default function TrackingPage() {
       const lastStep = req.path[req.path.length - 1];
       const role = (typeof lastStep === 'string' ? lastStep : lastStep.department || lastStep.mainRole || "").toLowerCase().trim();
       const user = usersList.find(u => (u.department || u.mainRole || "").toLowerCase().trim() === role);
-      if (user) return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      if (user) return language === 'kh' ? (user.fullname_kh || user.fullname_en || user.username) : (user.fullname_en || user.fullname_kh || user.username);
     }
     return "Final Receiver";
   };
@@ -309,7 +290,7 @@ export default function TrackingPage() {
                       <div key={groupName} className="flex flex-col mb-4">
                         <h3 className="text-[13px] font-medium text-gray-800 dark:text-gray-200 mb-3 ml-2">{groupName}</h3>
                         <div className="space-y-2">
-                          {items.map(req => {
+                          {items.map((req, idx) => {
                             const isActive = selectedRequest?.id === req.id;
                             const isCompleted = req.status === "Completed";
                             const isImprove = req.status === "Assigned to Improve";
@@ -322,7 +303,7 @@ export default function TrackingPage() {
                             let finalTime = req.time || `${dateObj.getHours()}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
                             return (
                               <div
-                                key={req.id}
+                                key={req.id ? `track-req-${req.id}-${idx}` : `track-idx-${idx}`}
                                 onClick={() => setSelectedRequest(req)}
                                 className={`p-5 rounded-2xl cursor-pointer transition-all border ${isActive
                                     ? "bg-white dark:bg-[#242B36] border-blue-500 shadow-md ring-1 ring-blue-50 dark:ring-blue-500/20"
@@ -374,7 +355,18 @@ export default function TrackingPage() {
                     <div className="flex justify-between items-center mb-6">
                       <div>
                         <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{selectedRequest.title || selectedRequest.subject}</h2>
-                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{t('tracking_id')} <span className="text-blue-600 dark:text-blue-400 font-bold">{selectedRequest.trackingNumber || selectedRequest.id}</span></p>
+                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">
+                          {t('tracking_id')} <span className="text-blue-600 dark:text-blue-400 font-bold mr-4">{selectedRequest.trackingNumber || selectedRequest.id}</span>
+                          {(() => {
+                            if (!selectedRequest.dueDate || selectedRequest.status === "Completed" || selectedRequest.status === "Failed") return null;
+                            const now = new Date();
+                            const due = new Date(selectedRequest.dueDate);
+                            const diffTime = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+                            if (diffTime < 0) return <span className="px-2 py-1 rounded bg-red-100 text-red-600 text-xs font-bold dark:bg-red-900/40 dark:text-red-400">Overdue by {Math.abs(diffTime)}d</span>;
+                            if (diffTime <= 1) return <span className="px-2 py-1 rounded bg-orange-100 text-orange-600 text-xs font-bold dark:bg-orange-900/40 dark:text-orange-400">Due in {diffTime}d</span>;
+                            return <span className="px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs font-bold dark:bg-gray-800 dark:text-gray-400">Due in {diffTime}d</span>;
+                          })()}
+                        </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shadow-inner">
@@ -456,14 +448,15 @@ export default function TrackingPage() {
                           const visualCurrentStep = (selectedRequest.currentStepIndex || 0) + 1;
                           const targetName = getEnglishName(selectedRequest?.senderName || "").toLowerCase().trim();
                           const senderNodeUser = targetName ? usersList.find(u => {
-                            const fName = getEnglishName(`${u.firstName || ""} ${u.lastName || ""}`).toLowerCase().trim();
+                            const fEn = getEnglishName(u.fullname_en || "").toLowerCase().trim();
+                            const fKh = getEnglishName(u.fullname_kh || "").toLowerCase().trim();
                             const uName = getEnglishName(u.username || u.name || "").toLowerCase().trim();
-                            if (fName === targetName || uName === targetName) return true;
-                            const fNameParts = fName.split(' ');
-                            const uNameParts = uName.split(' ');
-                            return fNameParts.includes(targetName) || uNameParts.includes(targetName);
+                            if (fEn === targetName || fKh === targetName || uName === targetName) return true;
+                            const fEnParts = fEn.split(' ');
+                            const fKhParts = fKh.split(' ');
+                            return fEnParts.includes(targetName) || fKhParts.includes(targetName);
                           }) : null;
-                          const displaySenderPhoto = selectedRequest?.senderPhoto || (senderNodeUser ? (senderNodeUser.profilePhoto || senderNodeUser.photo) : null);
+                          const displaySenderPhoto = (senderNodeUser && (senderNodeUser.profilePhoto || senderNodeUser.photo)) ? (senderNodeUser.profilePhoto || senderNodeUser.photo) : (selectedRequest?.senderPhoto || null);
 
                           const visualPath = selectedRequest.path ? [
                             {
@@ -509,21 +502,60 @@ export default function TrackingPage() {
                                   }
                                 };
                                 const dateText = formatSketchDate(dateStr);
-                                const userName = (() => {
-                                  let name = "Unknown User";
-                                  if (dept.isSenderNode) name = dept.userSign;
-                                  else if (idx === 1 && selectedRequest.createdBy && !selectedRequest.path[0]?.assignedTo) name = selectedRequest.createdBy; // old idx===0 fallback
-                                  else if (isLast && isCompleted && selectedRequest.completedBy) name = selectedRequest.completedBy;
-                                  else if (dept.assignedTo) {
-                                    name = dept.assignedTo.name;
+                                const matchedUser = (() => {
+                                  if (dept.isSenderNode) return senderNodeUser;
+                                  if (dept.assignedTo) {
+                                    const aName = getEnglishName(dept.assignedTo.name).toLowerCase().trim();
+                                    return usersList.find(u => {
+                                      const fEn = getEnglishName(u.fullname_en || "").toLowerCase().trim();
+                                      const fKh = getEnglishName(u.fullname_kh || "").toLowerCase().trim();
+                                      const uName = getEnglishName(u.username || u.name || "").toLowerCase().trim();
+                                      return fEn === aName || fKh === aName || uName === aName;
+                                    });
                                   }
-                                  else {
-                                    const roleStr = typeof dept === 'string' ? dept : (dept.department || dept.mainRole || "");
-                                    const matchedUser = usersList.find(u => (u.department || u.mainRole || "").toLowerCase().trim() === roleStr.toLowerCase().trim());
-                                    if (matchedUser) name = `${matchedUser.firstName || ''} ${matchedUser.lastName || ''}`.trim();
+                                  let targetName = "";
+                                  if (idx === 1 && selectedRequest.createdBy && !selectedRequest.path[0]?.assignedTo) {
+                                    targetName = getEnglishName(selectedRequest.createdBy).toLowerCase().trim();
+                                  } else if (isLast && isCompleted && selectedRequest.completedBy) {
+                                    targetName = getEnglishName(selectedRequest.completedBy).toLowerCase().trim();
                                   }
-                                  return getEnglishName(name);
+                                  if (targetName) {
+                                    const found = usersList.find(u => {
+                                      const fEn = getEnglishName(u.fullname_en || "").toLowerCase().trim();
+                                      const fKh = getEnglishName(u.fullname_kh || "").toLowerCase().trim();
+                                      const uName = getEnglishName(u.username || u.name || "").toLowerCase().trim();
+                                      return fEn === targetName || fKh === targetName || uName === targetName;
+                                    });
+                                    if (found) return found;
+                                  }
+                                  const roleStr = typeof dept === 'string' ? dept : (dept.department || dept.mainRole || "");
+                                  if (roleStr) {
+                                    const target = roleStr.toLowerCase().trim();
+                                    return usersList.find(u => {
+                                      const deptName = typeof u.department === 'object' && u.department ? u.department.name : (u.department || u.mainRole || "");
+                                      if (deptName.toLowerCase().trim() === target) return true;
+                                      if (u.roles && u.roles.length > 0) {
+                                        return u.roles.some(r => r.name.toLowerCase().includes(target) || (r.department && r.department.name && r.department.name.toLowerCase().trim() === target));
+                                      }
+                                      return false;
+                                    });
+                                  }
+                                  return null;
                                 })();
+
+                                const userName = (() => {
+                                  if (dept.isSenderNode) return getEnglishName(dept.userSign || selectedRequest.senderName);
+                                  if (dept.assignedTo) return getEnglishName(dept.assignedTo.name);
+                                  if (idx === 1 && selectedRequest.createdBy && !selectedRequest.path[0]?.assignedTo) return getEnglishName(selectedRequest.createdBy);
+                                  if (isLast && isCompleted && selectedRequest.completedBy) return getEnglishName(selectedRequest.completedBy);
+                                  if (matchedUser) {
+                                    return getEnglishName(language === 'kh' ? (matchedUser.fullname_kh || matchedUser.fullname_en) : (matchedUser.fullname_en || matchedUser.fullname_kh || matchedUser.username));
+                                  }
+                                  return "Unknown User";
+                                })();
+
+                                const userPhoto = dept.isSenderNode ? dept.photo : (matchedUser?.profilePhoto || matchedUser?.photo || dept.photo || null);
+
                                 const pinColors = ['bg-[#E84B7D]', 'bg-[#F28F1D]', 'bg-[#9D8DF1]', 'bg-[#40A9FF]', 'bg-[#36CFC9]'];
                                 const pinColorClass = dept.isSenderNode ? 'bg-[#008000]' : pinColors[(idx - 1 + pinColors.length) % pinColors.length];
                                 const lineColorClass = isPast || (isActive && isCompleted) ? "border-gray-900 dark:border-gray-400" : isActive && (isImprovement || isFailed) ? "border-red-600 dark:border-red-500" : isActive ? "border-gray-900 dark:border-gray-400" : "border-gray-300 dark:border-[#2A2F3A]";
@@ -534,17 +566,15 @@ export default function TrackingPage() {
                                           "border-l-4 border-l-gray-300 dark:border-l-[#2A2F3A] border-t-gray-100 dark:border-t-[#2A2F3A] border-r-gray-100 dark:border-r-[#2A2F3A] border-b-gray-100 dark:border-b-[#2A2F3A]"
                                     }`}>
                                     <div className="flex flex-col gap-1.5 mb-2 text-left">
-                                      {dept.isSenderNode && (
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <div className="w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shrink-0 shadow-sm">
-                                            {dept.photo ? (
-                                              <img src={dept.photo} alt="Sender" className="w-full h-full object-cover" />
-                                            ) : (
-                                              <svg className="w-full h-full text-gray-400 p-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
-                                            )}
-                                          </div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shrink-0 shadow-sm">
+                                          {userPhoto ? (
+                                            <img src={userPhoto} alt="User Avatar" className="w-full h-full object-cover" />
+                                          ) : (
+                                            <svg className="w-full h-full text-gray-400 p-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                                          )}
                                         </div>
-                                      )}
+                                      </div>
                                       <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200">
                                         {dept.isSenderNode ? (t("request_by") || "Request by") + " :" : isPast ? (t("approved_by") || "Approved by") + " :" : isActive ? (dept.assignedTo ? (t("assigned_to") || "Assigned to") + " :" : (t("pending_at") || "Pending at") + " :") : (t("next_approver") || "Next approver") + " :"} <span className="font-semibold text-gray-500 dark:text-gray-400 ml-1">{userName}</span>
                                       </p>
@@ -553,24 +583,12 @@ export default function TrackingPage() {
                                       </p>
                                       <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200 mt-0.5 truncate w-full">
                                         Role: <span className="font-semibold text-gray-500 dark:text-gray-400 ml-1">{(() => {
-                                          const roleStr = typeof dept === 'string' ? dept : (dept.department || dept.mainRole || "");
-                                          const targetName = userName.toLowerCase().trim();
-                                          const matchedUser = usersList.find(u => {
-                                            const fname = getEnglishName(`${u.firstName || ''} ${u.lastName || ''}`).toLowerCase().trim();
-                                            const uname = getEnglishName(u.username || u.name || '').toLowerCase().trim();
-                                            if (fname === targetName || uname === targetName) return true;
-                                            const fnameParts = fname.split(' ');
-                                            const unameParts = uname.split(' ');
-                                            return fnameParts.includes(targetName) || unameParts.includes(targetName) || targetName.includes(fname) || targetName.includes(uname);
-                                          }) || usersList.find(u => (u.department || u.mainRole || "").toLowerCase().trim() === roleStr.toLowerCase().trim());
-
-                                          if (dept.isSenderNode) return matchedUser ? (matchedUser.role || "Staff") : "Staff";
-
-                                          if (userName === "Pending" || userName === "Unknown") {
-                                            return matchedUser ? (matchedUser.role || dept.role || "Staff") : (dept.role || "Staff");
+                                          if (matchedUser) {
+                                            const actualRole = (matchedUser.roles && matchedUser.roles.length > 0) ? matchedUser.roles[0].name : matchedUser.role;
+                                            if (actualRole) return actualRole;
                                           }
-
-                                          return matchedUser ? (matchedUser.role || "Staff") : (dept.role || "Staff");
+                                          if (typeof dept !== 'string' && dept.role) return dept.role;
+                                          return "Staff";
                                         })()}</span>
                                       </p>
                                     </div>
@@ -663,6 +681,8 @@ export default function TrackingPage() {
                             </div>
                           );
                         })()}
+
+
                       </div>
                     )}
                   </div>

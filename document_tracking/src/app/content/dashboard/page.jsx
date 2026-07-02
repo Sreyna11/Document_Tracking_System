@@ -11,6 +11,9 @@ import {
     BarChart, Bar, Cell
 } from "recharts";
 import { Bell, FileText, CheckCircle, XCircle, Clock, Calendar, ChevronDown, ChevronRight, X, Info } from "lucide-react";
+import { useDocuments } from '../../../hooks/useDocuments';
+import { useAccounts } from '../../../hooks/useAccounts';
+
 const CustomXAxisTick = (props) => {
     const { x, y, payload } = props;
     const words = payload.value.split(' ');
@@ -41,11 +44,10 @@ const CustomXAxisTick = (props) => {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 export default function DashboardPage() {
     const router = useRouter();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { isSidebarOpen, setIsSidebarOpen } = useSidebar();
     const [isMounted, setIsMounted] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
-    const [usersList, setUsersList] = useState([]);
     const today = new Date();
     const currentMonthValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
@@ -60,6 +62,9 @@ export default function DashboardPage() {
     const [longestApprovalRequests, setLongestApprovalRequests] = useState([]);
     const [docTypeUsageData, setDocTypeUsageData] = useState([]);
     const [recentRequests, setRecentRequests] = useState([]);
+
+    const { data: usersList } = useAccounts();
+    const { data: requestsData } = useDocuments();
     useEffect(() => {
         if (showLongestModal) {
             document.body.style.overflow = 'hidden';
@@ -74,17 +79,16 @@ export default function DashboardPage() {
             router.push("/");
             return;
         }
-        const user = JSON.parse(userStr);
-        setCurrentUser(user);
+        setCurrentUser(JSON.parse(userStr));
         setIsMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isMounted || !currentUser) return;
+        
         const loadData = () => {
-            try {
-                const usersStr = localStorage.getItem("doc_tracking_users");
-                if (usersStr) setUsersList(JSON.parse(usersStr));
-            } catch (e) {
-                console.error("Error loading users", e);
-            }
-            const reqs = JSON.parse(localStorage.getItem("doc_tracking_requests") || "[]");
+            const user = currentUser;
+            const reqs = requestsData || [];
             const userDept = (user.mainRole || user.department || "").toLowerCase().trim();
             // Generate the last 12 months for the dropdown
             const monthsSet = new Set();
@@ -314,14 +318,7 @@ export default function DashboardPage() {
             setRecentRequests(mySentRequests.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3));
         };
         loadData();
-        const handleStorageChange = (e) => {
-            if (e.key === "doc_tracking_requests") {
-                loadData();
-            }
-        };
-        window.addEventListener("storage", handleStorageChange);
-        return () => window.removeEventListener("storage", handleStorageChange);
-    }, [selectedMonth, chartTimeframe]);
+    }, [isMounted, currentUser, selectedMonth, chartTimeframe, requestsData, usersList]);
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return "Good morning";
@@ -330,13 +327,16 @@ export default function DashboardPage() {
     };
     const getDisplayName = () => {
         let name = "User";
-        if (currentUser?.firstName || currentUser?.lastName) {
-            name = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim();
-        } else if (currentUser?.username) {
-            name = currentUser.username;
+        if (currentUser) {
+            name = language === 'kh' 
+                ? (currentUser.fullname_kh || currentUser.fullname_en || currentUser.username) 
+                : (currentUser.fullname_en || currentUser.fullname_kh || currentUser.username);
         }
-        const englishOnly = name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, " ").trim();
-        return englishOnly || name;
+        if (language === 'en') {
+            const englishOnly = name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, " ").trim();
+            return englishOnly || name;
+        }
+        return name;
     };
     const formatMonthOption = (val) => {
         if (!val) return "";
@@ -352,10 +352,15 @@ export default function DashboardPage() {
             const lastStep = req.path[req.path.length - 1];
             const role = (typeof lastStep === 'string' ? lastStep : lastStep.mainRole).toLowerCase().trim();
             const user = usersList.find(u => (u.mainRole || u.department || "").toLowerCase().trim() === role);
-            if (user) name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+            if (user) {
+                name = language === 'kh' ? (user.fullname_kh || user.fullname_en || user.username) : (user.fullname_en || user.fullname_kh || user.username);
+            }
         }
-        const englishOnly = name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, " ").trim();
-        return englishOnly || name;
+        if (language === 'en') {
+            const englishOnly = name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, " ").trim();
+            return englishOnly || name;
+        }
+        return name;
     };
     const getFallbackSignerRole = (req) => {
         if (req.completedByRole) return req.completedByRole;
@@ -730,8 +735,8 @@ export default function DashboardPage() {
                                                             name = req.path[0].senderName || req.path[0].user || req.path[0].actionBy;
                                                         }
                                                         if (name) {
-                                                            const u = usersList.find(u => u.username === name || u.email === name);
-                                                            if (u) return `${u.firstName || ''} ${u.lastName || ''}`.trim() || name;
+                                                            const u = usersList.find(u => u.username === name || u.email === name || (u.fullname_en && u.fullname_en.toLowerCase() === name.toLowerCase()));
+                                                            if (u) return (language === 'kh' ? (u.fullname_kh || u.fullname_en) : (u.fullname_en || u.fullname_kh)) || name;
                                                             return name;
                                                         }
                                                         return req.senderDepartment || "Unknown User";

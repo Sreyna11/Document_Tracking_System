@@ -19,6 +19,7 @@ class DocumentApproval extends Model
         "document_id",
         "version_number",
         "approver_id",
+        "department_id",
         "status",
         "comments",
         "approved_at",
@@ -34,6 +35,9 @@ class DocumentApproval extends Model
     {
         return $this->belongsTo(User::class, "approver_id", "user_id");
     }
-
+    public function department()
+    {
+        return $this->belongsTo(Department::class, "department_id", "department_id");
+    }
 
 }

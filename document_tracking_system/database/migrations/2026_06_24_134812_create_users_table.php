@@ -22,9 +22,6 @@ return new class extends Migration {
                 ->nullable()
                 ->constrained('departments', 'department_id');
 
-            $table->foreignId('role_id')
-                ->nullable()
-                ->constrained('roles', 'role_id');
 
             $table->boolean('is_active')->default(true);
 
